@@ -1,0 +1,13 @@
+# Environment
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Uploaded files
+src/backend/uploads/
+
+# Node
+node_modules/

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI CV Skill Gap</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <div class="brand">
+            <div class="brand-mark">AI</div>
+            <div>
+              <p class="eyebrow">Talent Insight</p>
+              <h1>CV Skill Gap</h1>
+            </div>
+          </div>
+
+          <nav class="nav">
+            <button class="nav-item active" data-view="dashboard">Dashboard</button>
+            <button class="nav-item" data-view="analysis">CV Analysis</button>
+            <button class="nav-item" data-view="skills">Skill Matrix</button>
+            <button class="nav-item" data-view="reports">Reports</button>
+            <button class="nav-item" data-view="settings">Settings</button>
+          </nav>
+        </div>
+
+        <div class="mini-card">
+          <p class="mini-label">AI status</p>
+          <div class="status-row">
+            <span class="status-dot"></span>
+            <strong>Online</strong>
+          </div>
+          <small>Model ready for scoring</small>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow muted" id="topbar-label">Overview</p>
+            <h2 id="topbar-title">Dashboard tổng quan</h2>
+          </div>
+          <button class="primary-btn" id="run-analysis">Run analysis</button>
+        </header>
+
+        <section id="dashboard" class="view-panel active">
+          <div class="overview-grid">
+            <article class="mini-metric accent-blue">
+              <span>CV analyzed</span>
+              <strong>1,248</strong>
+              <small>+12.4% vs last month</small>
+            </article>
+            <article class="mini-metric accent-green">
+              <span>Strong match</span>
+              <strong>74%</strong>
+              <small>325 candidates</small>
+            </article>
+            <article class="mini-metric accent-orange">
+              <span>Skill gap</span>
+              <strong>18%</strong>
+              <small>Need training</small>
+            </article>
+            <article class="mini-metric accent-purple">
+              <span>AI score avg</span>
+              <strong>81.6</strong>
+              <small>Across all roles</small>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="panel chart-panel">
+              <div class="panel-header">
+                <h3>Skill trend</h3>
+                <span class="pill neutral">Last 6 months</span>
+              </div>
+              <div class="chart-bars">
+                <div class="bar-group"><span class="bar" style="height: 48%"></span><label>Jan</label></div>
+                <div class="bar-group"><span class="bar" style="height: 55%"></span><label>Feb</label></div>
+                <div class="bar-group"><span class="bar" style="height: 62%"></span><label>Mar</label></div>
+                <div class="bar-group"><span class="bar" style="height: 68%"></span><label>Apr</label></div>
+                <div class="bar-group"><span class="bar" style="height: 76%"></span><label>May</label></div>
+                <div class="bar-group"><span class="bar" style="height: 84%"></span><label>Jun</label></div>
+              </div>
+            </div>
+
+            <div class="panel applicant-panel">
+              <div class="panel-header">
+                <h3>Recent applicants</h3>
+                <span class="pill neutral">Top 3</span>
+              </div>
+              <div class="applicant-list">
+                <div class="applicant-item">
+                  <div class="avatar small">HN</div>
+                  <div>
+                    <h4>Hoàng Nam</h4>
+                    <p>Data Analyst</p>
+                  </div>
+                  <strong>82%</strong>
+                </div>
+                <div class="applicant-item">
+                  <div class="avatar small">LM</div>
+                  <div>
+                    <h4>Lê Minh</h4>
+                    <p>AI Engineer</p>
+                  </div>
+                  <strong>79%</strong>
+                </div>
+                <div class="applicant-item">
+                  <div class="avatar small">QT</div>
+                  <div>
+                    <h4>Quỳnh Trang</h4>
+                    <p>Business Analyst</p>
+                  </div>
+                  <strong>76%</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="analysis" class="view-panel">
+          <div class="content-grid">
+            <div class="left-column">
+              <div class="panel upload-panel">
+                <div class="panel-header">
+                  <h3>Upload hồ sơ</h3>
+                  <span class="pill">PDF / DOCX</span>
+                </div>
+
+                <label class="upload-box" for="cv-upload">
+                  <input id="cv-upload" type="file" accept=".pdf,.doc,.docx" />
+                  <span class="upload-icon">⇪</span>
+                  <span>Tải lên CV của bạn</span>
+                </label>
+
+                <div class="field-group">
+                  <label for="job-desc">Mô tả công việc</label>
+                  <textarea id="job-desc" rows="8">Yêu cầu: Python, SQL, Machine Learning, NLP, phân tích dữ liệu, làm việc với team, trình bày báo cáo, sử dụng Git, Docker, Cloud.</textarea>
+                </div>
+              </div>
+
+              <div class="panel summary-panel">
+                <div class="panel-header">
+                  <h3>Kết quả đánh giá</h3>
+                  <span class="pill success">78% phù hợp</span>
+                </div>
+
+                <div class="stats-grid">
+                  <div class="stat-card accent-blue">
+                    <p>Tương thích</p>
+                    <strong id="score-match">78%</strong>
+                  </div>
+                  <div class="stat-card accent-green">
+                    <p>Kỹ năng khớp</p>
+                    <strong id="skill-match">6/9</strong>
+                  </div>
+                  <div class="stat-card accent-orange">
+                    <p>Thiếu kỹ năng</p>
+                    <strong id="skill-gap">3</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="right-column">
+              <div class="panel preview-panel">
+                <div class="panel-header">
+                  <h3>Xem trước CV</h3>
+                  <span class="pill neutral">Candidate A</span>
+                </div>
+
+                <div class="candidate-card">
+                  <div class="avatar">HN</div>
+                  <div>
+                    <h4>Hoàng Nam</h4>
+                    <p>Data Analyst / AI Engineer</p>
+                  </div>
+                </div>
+
+                <ul class="info-list">
+                  <li><span>Experience</span><strong>3 năm</strong></li>
+                  <li><span>Major</span><strong>Computer Science</strong></li>
+                  <li><span>Location</span><strong>Hà Nội</strong></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="bottom-grid">
+            <div class="panel skill-panel">
+              <div class="panel-header">
+                <h3>Kỹ năng phù hợp</h3>
+              </div>
+              <ul class="skill-list" id="matched-skills">
+                <li><span>Python</span><div class="progress"><i style="width: 92%"></i></div></li>
+                <li><span>SQL</span><div class="progress"><i style="width: 88%"></i></div></li>
+                <li><span>Machine Learning</span><div class="progress"><i style="width: 80%"></i></div></li>
+                <li><span>Data Analysis</span><div class="progress"><i style="width: 85%"></i></div></li>
+              </ul>
+            </div>
+
+            <div class="panel gap-panel">
+              <div class="panel-header">
+                <h3>Kỹ năng còn thiếu</h3>
+              </div>
+              <ul class="gap-list" id="missing-skills">
+                <li>Docker</li>
+                <li>Cloud Deployment</li>
+                <li>NLP nâng cao</li>
+              </ul>
+            </div>
+
+            <div class="panel rec-panel">
+              <div class="panel-header">
+                <h3>Khuyến nghị</h3>
+              </div>
+              <ul class="recommendations" id="recommendations">
+                <li>Hoàn thiện Docker và CI/CD cho dự án AI.</li>
+                <li>Rèn thêm kỹ năng NLP và mô hình hóa dữ liệu.</li>
+                <li>Tham gia khóa học về Azure / Cloud AI.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="skills" class="view-panel">
+          <div class="panel matrix-panel">
+            <div class="panel-header">
+              <h3>Skill Matrix</h3>
+              <span class="pill neutral">Weighted score</span>
+            </div>
+
+            <div class="matrix-table">
+              <div class="matrix-row head">
+                <span>Skill</span>
+                <span>Required</span>
+                <span>Candidate</span>
+                <span>Status</span>
+              </div>
+              <div class="matrix-row">
+                <span>Python</span>
+                <span>90</span>
+                <span>92</span>
+                <span class="tag ok">Strong</span>
+              </div>
+              <div class="matrix-row">
+                <span>SQL</span>
+                <span>85</span>
+                <span>88</span>
+                <span class="tag ok">Strong</span>
+              </div>
+              <div class="matrix-row">
+                <span>Machine Learning</span>
+                <span>80</span>
+                <span>76</span>
+                <span class="tag warn">Moderate</span>
+              </div>
+              <div class="matrix-row">
+                <span>Docker</span>
+                <span>75</span>
+                <span>45</span>
+                <span class="tag danger">Gap</span>
+              </div>
+              <div class="matrix-row">
+                <span>Cloud</span>
+                <span>80</span>
+                <span>52</span>
+                <span class="tag danger">Gap</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="reports" class="view-panel">
+          <div class="report-grid">
+            <div class="panel report-card">
+              <div class="panel-header">
+                <h3>Overall report</h3>
+              </div>
+              <div class="big-score">81.6</div>
+              <p class="muted-text">Assessment score for the current candidate pool.</p>
+            </div>
+            <div class="panel report-card">
+              <div class="panel-header">
+                <h3>Priority focus</h3>
+              </div>
+              <ul class="list-check">
+                <li>Cloud deployment</li>
+                <li>Docker & CI/CD</li>
+                <li>Advanced NLP</li>
+              </ul>
+            </div>
+            <div class="panel report-card wide">
+              <div class="panel-header">
+                <h3>Recommendation summary</h3>
+              </div>
+              <table class="report-table">
+                <thead>
+                  <tr>
+                    <th>Area</th>
+                    <th>Issue</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>AI Engineering</td>
+                    <td>Model deployment</td>
+                    <td>Train on Azure / Docker</td>
+                  </tr>
+                  <tr>
+                    <td>Data</td>
+                    <td>Incomplete pipeline</td>
+                    <td>Improve ETL workflow</td>
+                  </tr>
+                  <tr>
+                    <td>Language</td>
+                    <td>NLP depth</td>
+                    <td>Complete text modeling course</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="settings" class="view-panel">
+          <div class="settings-grid">
+            <div class="panel settings-card">
+              <div class="panel-header">
+                <h3>AI model settings</h3>
+              </div>
+              <div class="toggle-row">
+                <span>Auto-detect CV language</span>
+                <label class="switch"><input type="checkbox" checked /><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <span>Skill recommendation mode</span>
+                <label class="switch"><input type="checkbox" checked /><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <span>Enable model benchmarking</span>
+                <label class="switch"><input type="checkbox" /><span class="slider"></span></label>
+              </div>
+            </div>
+
+            <div class="panel settings-card">
+              <div class="panel-header">
+                <h3>Threshold</h3>
+              </div>
+              <div class="slider-block">
+                <label for="match-threshold">Match threshold</label>
+                <input id="match-threshold" type="range" min="0" max="100" value="78" />
+                <strong>78%</strong>
+              </div>
+              <div class="slider-block">
+                <label for="gap-threshold">Gap alert level</label>
+                <input id="gap-threshold" type="range" min="0" max="100" value="35" />
+                <strong>35%</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
