@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { authApi, cvApi } from '../services/api';
+import { usersApi, cvApi } from '../services/api';
 import type { Profile, CV, CVAnalysis } from '../types';
 import { User, MapPin, Briefcase, Mail, Phone, GitBranch, Globe, Award, Code, BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -16,7 +16,7 @@ export default function SkillProfilePage() {
     const fetchData = async () => {
       try {
         const [profileData, cvsData] = await Promise.all([
-          authApi.getProfile(),
+          usersApi.getProfile(),
           cvApi.list()
         ]);
         setProfile(profileData);

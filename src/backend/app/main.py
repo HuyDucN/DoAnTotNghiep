@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.api import auth, cv, jobs
+from app.api import auth, cv, jobs, users, skills
 
 # Create all tables on startup
 Base.metadata.create_all(bind=engine)
@@ -55,9 +55,10 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Routers
 app.include_router(auth.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
+app.include_router(skills.router, prefix="/api")
 app.include_router(cv.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
-
 
 @app.get("/", tags=["Health"])
 def root():

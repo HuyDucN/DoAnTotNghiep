@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # JWT
     SECRET_KEY: str = "change-me-in-production-must-be-at-least-32-characters"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 ngày
 
     # Google Gemini AI
     GEMINI_API_KEY: str = ""

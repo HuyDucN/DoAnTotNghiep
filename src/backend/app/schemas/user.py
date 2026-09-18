@@ -11,8 +11,8 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def password_must_be_strong(cls, v: str) -> str:
-        if len(v) < 6:
-            raise ValueError("Mật khẩu phải có ít nhất 6 ký tự")
+        if len(v) < 8:
+            raise ValueError("Mật khẩu phải có ít nhất 8 ký tự")
         return v
 
     @field_validator("full_name")
@@ -68,6 +68,34 @@ class ProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_must_be_strong(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Mật khẩu mới phải có ít nhất 8 ký tự")
+        return v
+
+
+class ForgotPassword(BaseModel):
+    email: EmailStr
+
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_must_be_strong(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Mật khẩu mới phải có ít nhất 8 ký tự")
+        return v
 
 
 # Forward reference resolution

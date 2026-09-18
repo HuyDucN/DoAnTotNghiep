@@ -61,7 +61,7 @@ async def upload_cv(
     db.refresh(cv)
 
     # Trigger background AI analysis
-    background_tasks.add_task(process_cv_analysis, cv.id, file_path, db)
+    background_tasks.add_task(process_cv_analysis, cv.id, file_path)
 
     return cv
 
@@ -123,11 +123,11 @@ def reanalyze_cv(
 
     cv.status = "processing"
     db.commit()
-    background_tasks.add_task(process_cv_analysis, cv.id, cv.file_path, db)
+    background_tasks.add_task(process_cv_analysis, cv.id, cv.file_path)
     return cv
 
 
-def process_cv_analysis(cv_id: int, file_path: str, db: Session):
+def process_cv_analysis(cv_id: int, file_path: str):
     """Background task: extract text → AI analysis → save results."""
     from app.core.database import SessionLocal
     # Use a new DB session in background task

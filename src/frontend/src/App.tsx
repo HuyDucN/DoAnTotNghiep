@@ -9,38 +9,44 @@ import DashboardPage from './pages/DashboardPage';
 import CVPage from './pages/CVPage';
 import SkillProfilePage from './pages/SkillProfilePage';
 import JobsPage from './pages/JobsPage';
-
-// We will create these pages next
-const PlaceholderPage = ({ title }: { title: string }) => (
-  <div className="card animate-fade-in flex items-center justify-center" style={{ height: '400px' }}>
-    <h2 className="text-muted">{title} - Coming Soon</h2>
-  </div>
-);
+import ReportsPage from './pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
   return (
     <BrowserRouter>
-      <Toaster position="top-right" toastOptions={{
-        style: {
-          background: '#1c1c28',
-          color: '#f1f1f8',
-          border: '1px solid rgba(255,255,255,0.1)'
-        }
-      }} />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#1c1c28',
+            color: '#f1f1f8',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '10px',
+            fontSize: '0.9rem',
+          },
+          success: { iconTheme: { primary: '#10b981', secondary: '#1c1c28' } },
+          error:   { iconTheme: { primary: '#ef4444', secondary: '#1c1c28' } },
+        }}
+      />
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        {/* Public routes */}
+        <Route path="/login"    element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        
+
+        {/* Protected routes — wrapped in AppLayout */}
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="cv" element={<CVPage />} />
-          <Route path="profile" element={<SkillProfilePage />} />
-          <Route path="jobs" element={<JobsPage />} />
-          <Route path="reports" element={<PlaceholderPage title="Skill Gap Reports" />} />
-          <Route path="settings" element={<PlaceholderPage title="Settings" />} />
+          <Route path="cv"        element={<CVPage />} />
+          <Route path="profile"   element={<SkillProfilePage />} />
+          <Route path="jobs"      element={<JobsPage />} />
+          <Route path="reports"   element={<ReportsPage />} />
+          <Route path="settings"  element={<SettingsPage />} />
         </Route>
-        
+
+        {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

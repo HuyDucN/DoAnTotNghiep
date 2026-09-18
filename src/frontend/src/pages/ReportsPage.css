@@ -1,0 +1,178 @@
+.reports-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.reports-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.reports-header h2 { margin: 0; font-size: 1.4rem; }
+
+/* Empty state */
+.empty-reports {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-10) var(--space-6);
+  gap: var(--space-2);
+}
+
+/* Report List */
+.reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.report-card {
+  overflow: hidden;
+  transition: box-shadow var(--duration-fast);
+}
+.report-card:hover {
+  box-shadow: 0 0 0 1px rgba(99,102,241,0.35);
+}
+
+/* Row (always visible) */
+.report-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  cursor: pointer;
+  padding: var(--space-4) var(--space-5);
+}
+
+.report-job {
+  flex: 1;
+  min-width: 0;
+}
+.report-job h4 {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.report-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+/* Score ring */
+.report-score-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid;
+  flex-shrink: 0;
+}
+.score-bg-success { border-color: var(--color-success); background: rgba(16,185,129,0.08); }
+.score-bg-warning { border-color: var(--color-warning); background: rgba(245,158,11,0.08); }
+.score-bg-danger  { border-color: var(--color-danger);  background: rgba(239,68,68,0.08);  }
+.report-score-ring strong { font-size: 1.1rem; font-weight: 800; line-height: 1; }
+.report-score-ring span   { font-size: 0.65rem; color: var(--text-secondary); }
+
+/* Skill counts summary */
+.skill-counts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.skill-count-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.8rem;
+}
+
+.expand-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background var(--duration-fast);
+  flex-shrink: 0;
+}
+.expand-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Detail section */
+.report-detail {
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.skill-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+.skill-col-report h5 { margin: 0 0 var(--space-3) 0; font-size: 0.9rem; }
+
+/* Skill tags */
+.skill-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.skill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.skill-tag-success { background: rgba(16,185,129,0.15); color: var(--color-success); }
+.skill-tag-missing { background: rgba(239,68,68,0.12);  color: var(--color-danger); }
+.skill-tag-weak    { background: rgba(245,158,11,0.15); color: var(--color-warning); }
+
+.priority-high   { border: 1px solid rgba(239,68,68,0.4); }
+.priority-medium { border: 1px solid rgba(245,158,11,0.3); }
+.priority-low    { border: 1px solid rgba(156,163,175,0.3); }
+
+.tag-label {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,0.12);
+  font-weight: 700;
+}
+
+/* AI Recommendation */
+.ai-rec-block {
+  background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.05) 100%);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+.ai-rec-block h5 { margin: 0 0 var(--space-3) 0; font-size: 0.9rem; }
+.ai-rec-text p {
+  margin: 0 0 var(--space-2) 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.ai-rec-text p:last-child { margin: 0; }
+
+.divider {
+  height: 1px;
+  background: var(--bg-border);
+  margin: 0 0 var(--space-4) 0;
+}

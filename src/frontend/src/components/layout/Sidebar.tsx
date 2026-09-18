@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { LayoutDashboard, FileText, Target, BarChart2, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, FileText, Target, Briefcase, ClipboardList, Settings, LogOut, Bot } from 'lucide-react';
 import './Layout.css';
 
 export default function Sidebar() {
@@ -45,10 +45,10 @@ export default function Sidebar() {
             <Target size={18} /> Hồ sơ kỹ năng
           </NavLink>
           <NavLink to="/jobs" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <BarChart2 size={18} /> Vị trí & So khớp
+            <Briefcase size={18} /> Vị trí & So khớp
           </NavLink>
           <NavLink to="/reports" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <BarChart2 size={18} /> Báo cáo kỹ năng
+            <ClipboardList size={18} /> Báo cáo kỹ năng
           </NavLink>
           <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Settings size={18} /> Cài đặt
@@ -61,7 +61,7 @@ export default function Sidebar() {
           <p className="mini-label">Trạng thái AI</p>
           <div className="status-row">
             <span className="status-dot"></span>
-            <strong>Gemini 1.5 Trực tuyến</strong>
+            <strong>Gemini 2.0 Trực tuyến</strong>
           </div>
         </div>
         <button className="nav-item text-muted w-full" onClick={handleLogout}>

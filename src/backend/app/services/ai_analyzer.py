@@ -101,7 +101,7 @@ def _get_gemini_model():
     try:
         import google.generativeai as genai
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        return genai.GenerativeModel("gemini-3.6-flash")
+        return genai.GenerativeModel("gemini-2.0-flash")
     except ImportError:
         raise RuntimeError("google-generativeai chưa được cài đặt")
 
