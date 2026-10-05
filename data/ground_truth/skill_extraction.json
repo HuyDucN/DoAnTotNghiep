@@ -1,0 +1,4 @@
+[
+  {"id": "sample-01", "text": "Python, FastAPI, MySQL", "skills": ["python", "fastapi", "mysql"]},
+  {"id": "sample-02", "text": "React and TypeScript developer", "skills": ["react", "typescript"]}
+]
