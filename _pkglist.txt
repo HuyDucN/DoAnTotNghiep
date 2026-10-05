@@ -1,0 +1,14 @@
+click
+click-8.5.0.dist-info
+distutils-precedence.pth
+h11
+h11-0.16.0.dist-info
+pip
+pip-24.0.dist-info
+pkg_resources
+setuptools
+setuptools-65.5.0.dist-info
+uvicorn
+uvicorn-0.53.0.dist-info
+_distutils_hack
+File Not Found

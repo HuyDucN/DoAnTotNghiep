@@ -1,0 +1,7 @@
+distutils-precedence.pth
+pip
+pip-24.0.dist-info
+pkg_resources
+setuptools
+setuptools-65.5.0.dist-info
+_distutils_hack

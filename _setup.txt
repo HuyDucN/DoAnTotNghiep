@@ -1,0 +1,56 @@
+# setup.ps1 — Cài đặt toàn bộ dependencies cho dự án
+# Chạy lần đầu tiên hoặc sau khi clone project
+# Usage: .\scripts\setup.ps1
+
+$root = Split-Path -Parent $PSScriptRoot
+
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  AI CV Skill Gap — Project Setup" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# ── Backend ──────────────────────────────────────────────────────────────────
+Write-Host "[1/2] Cài đặt Backend dependencies..." -ForegroundColor Yellow
+
+$backendDir = Join-Path $root "backend"
+Push-Location $backendDir
+
+if (-not (Test-Path "venv")) {
+    Write-Host "  → Tạo virtual environment..." -ForegroundColor Gray
+    python -m venv venv
+}
+
+Write-Host "  → Cài đặt Python packages..." -ForegroundColor Gray
+& ".\venv\Scripts\pip.exe" install -r requirements.txt --quiet
+
+if (-not (Test-Path ".env")) {
+    Copy-Item ".env.example" ".env"
+    Write-Host "  → Đã tạo .env từ .env.example (nhớ điền thông tin thực tế!)" -ForegroundColor Magenta
+}
+
+Pop-Location
+Write-Host "  ✅ Backend sẵn sàng" -ForegroundColor Green
+
+# ── Frontend ─────────────────────────────────────────────────────────────────
+Write-Host ""
+Write-Host "[2/2] Cài đặt Frontend dependencies..." -ForegroundColor Yellow
+
+$frontendDir = Join-Path $root "frontend"
+Push-Location $frontendDir
+
+Write-Host "  → Chạy npm install..." -ForegroundColor Gray
+npm install --silent
+
+Pop-Location
+Write-Host "  ✅ Frontend sẵn sàng" -ForegroundColor Green
+
+# ── Done ─────────────────────────────────────────────────────────────────────
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  Setup hoàn tất! Tiếp theo:" -ForegroundColor Cyan
+Write-Host "  1. Sửa backend\.env với thông tin DB/Gemini" -ForegroundColor White
+Write-Host "  2. Chạy .\scripts\start_backend.ps1" -ForegroundColor White
+Write-Host "  3. Chạy .\scripts\start_frontend.ps1" -ForegroundColor White
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""

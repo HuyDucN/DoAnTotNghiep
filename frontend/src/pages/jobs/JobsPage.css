@@ -1,0 +1,354 @@
+/* ================================================================
+   Jobs Page Styling
+   ================================================================ */
+
+.jobs-page {
+  height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+}
+
+.jobs-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--space-5);
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .jobs-page { height: auto; }
+  .jobs-layout { grid-template-columns: 1fr; height: auto; }
+}
+
+/* ── Left Column (Job List) ──────────────────────────────────── */
+.jobs-list-col {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  border: 1px solid var(--bg-border);
+  box-shadow: var(--shadow-md);
+}
+
+/* Search bar */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: rgba(0, 0, 0, 0.25);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--bg-border);
+  transition: all var(--duration-fast);
+}
+.search-bar:focus-within {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px var(--brand-primary-glow);
+}
+.search-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  flex: 1;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.search-input::placeholder { color: var(--text-muted); }
+
+/* Filter bar */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(0, 0, 0, 0.15);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--bg-border);
+  position: relative;
+}
+.filter-select {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  flex: 1;
+  cursor: pointer;
+  appearance: none;
+}
+.filter-select option { background: var(--bg-elevated); }
+.jobs-count { font-size: 0.75rem; }
+
+/* Job cards list */
+.job-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  flex: 1;
+  padding-right: var(--space-1);
+}
+
+.job-card {
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  flex-shrink: 0;
+}
+.job-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateX(3px);
+}
+.job-card.selected {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 1px var(--brand-primary);
+}
+
+.job-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.job-card-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  color: var(--text-primary);
+  flex: 1;
+}
+.job-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.job-card-meta > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Right Column (Job Detail & Match) ───────────────────────── */
+.job-detail-col {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.job-detail-card {
+  padding: var(--space-8);
+}
+
+.job-detail-header {
+  margin-bottom: var(--space-5);
+}
+.job-detail-header h2 {
+  font-size: 1.6rem;
+  margin-bottom: var(--space-3);
+}
+.job-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.job-meta-row > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Match action */
+.match-action-area {
+  background: rgba(99, 102, 241, 0.04);
+  border: 1px dashed rgba(99, 102, 241, 0.25);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  margin-bottom: var(--space-6);
+}
+.match-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+.match-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Match Result ─────────────────────────────────────────────── */
+.match-result-area {
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+}
+
+.match-score-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--bg-border);
+}
+
+/* Score ring */
+.score-ring-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  width: 90px;
+  height: 90px;
+}
+.score-ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+}
+.score-ring-label strong {
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+.score-ring-label span {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Score pills row */
+.score-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.score-pill-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.score-pill-item.success { background: var(--color-success-bg); color: var(--color-success); }
+.score-pill-item.warning { background: var(--color-warning-bg); color: var(--color-warning); }
+.score-pill-item.danger  { background: var(--color-danger-bg);  color: var(--color-danger);  }
+
+/* Skills comparison — 3 columns */
+.skills-comparison {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+@media (max-width: 768px) {
+  .skills-comparison { grid-template-columns: 1fr; }
+}
+
+.skill-col-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-bottom: var(--space-3);
+}
+
+.skill-list-simple {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.skill-list-simple li {
+  font-size: 0.875rem;
+  padding: var(--space-2) var(--space-3);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background var(--duration-fast);
+}
+.skill-list-simple li:hover { background: rgba(255, 255, 255, 0.05); }
+
+/* AI Recommendation */
+.ai-recommendation {
+  background: linear-gradient(to right, rgba(14, 165, 233, 0.08), transparent);
+  border-left: 3px solid var(--brand-accent);
+  padding: var(--space-5) var(--space-6);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  margin-top: var(--space-6);
+}
+.ai-recommendation h4 {
+  margin-bottom: var(--space-3);
+  font-size: 1rem;
+}
+.ai-rec-content p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin-bottom: var(--space-2);
+}
+.ai-rec-content p:last-child { margin-bottom: 0; }
+
+/* Job description */
+.job-description { padding-top: var(--space-2); }
+.job-description h4 { font-size: 1rem; margin-bottom: var(--space-2); }
+
+/* Empty state — no job selected */
+.empty-job-state {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+}
+.empty-job-state h3 { color: var(--text-secondary); }
+
+/* Empty state in list */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  flex: 1;
+}
