@@ -1,0 +1,2 @@
+C:\Users\ADMIN\AppData\Local\Microsoft\WindowsApps\python.exe
+C:\Users\ADMIN\AppData\Local\Microsoft\WindowsApps\pip.exe

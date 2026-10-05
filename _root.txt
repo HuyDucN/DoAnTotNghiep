@@ -1,0 +1,14 @@
+.gitignore
+backend
+data
+docs
+doc_content.txt
+frontend
+Lo_trinh_chi_tiet_do_an_tot_nghiep_AI_CV_Skill_Gap.docx
+notebooks
+README.md
+scripts
+tests
+venv
+_pkglist.txt
+_root.txt

@@ -1,0 +1,3 @@
+setup.ps1
+start_backend.ps1
+start_frontend.ps1
