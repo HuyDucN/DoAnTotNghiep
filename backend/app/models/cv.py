@@ -12,6 +12,8 @@ class CV(Base):
     filename = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
     file_size = Column(Integer)  # bytes
+    file_hash = Column(String(64), nullable=True, index=True)  # SHA-256 hash — dùng để cache kết quả AI
+    analysis_run_id = Column(String(32), nullable=True)  # Identity of the current queued/running attempt.
     status = Column(
         Enum("uploaded", "processing", "analyzed", "failed"),
         default="uploaded",

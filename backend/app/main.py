@@ -1,6 +1,6 @@
 import os
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from app.core.http_errors import configure_http_errors
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.api import admin, auth, cv, jobs, users, skills
@@ -38,15 +38,6 @@ class LimitUploadSizeMiddleware(BaseHTTPMiddleware):
                 )
         return await call_next(request)
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Allow multipart overhead; cv.py enforces the 10MB file-size limit.
 app.add_middleware(LimitUploadSizeMiddleware, max_upload_size=11 * 1024 * 1024)
 
@@ -74,3 +65,6 @@ def root():
 @app.get("/health", tags=["Health"])
 def health_check():
     return {"status": "ok"}
+
+
+app = configure_http_errors(app, settings.cors_origins_list)

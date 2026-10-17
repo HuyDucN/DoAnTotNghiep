@@ -1,3 +1,0 @@
-WARNING: Package(s) not found: pyrefly
-fastapi                      0.115.0
-starlette                    0.38.6

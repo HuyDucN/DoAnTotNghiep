@@ -1,35 +1,45 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import './AuthPage.css';
+
+const loginSchema = z.object({
+  email: z.string().trim().email('Email không hợp lệ'),
+  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.email || !form.password) {
-      toast.error('Vui lòng điền đầy đủ thông tin');
-      return;
-    }
-    setLoading(true);
+  const onSubmit = async (form: LoginForm) => {
+    const sessionVersion = useAuthStore.getState().sessionVersion;
     try {
       const data = await authApi.login(form);
+      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
       setAuth(data.user, data.access_token);
       toast.success(`Chào mừng, ${data.user.full_name}! 🎉`);
       // Redirect theo role: admin → /admin, user → /dashboard
       navigate(data.user.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Đăng nhập thất bại');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -66,16 +76,17 @@ export default function LoginPage() {
         <h1 className="auth-title">Đăng nhập</h1>
         <p className="auth-subtitle">Chào mừng bạn trở lại! Hãy tiếp tục hành trình phát triển kỹ năng.</p>
 
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form onSubmit={handleSubmit(onSubmit)} className="auth-form" noValidate>
           <div className="form-group">
             <label className="form-label">Email</label>
             <input
               type="email"
-              className="form-input"
+              className={`form-input ${errors.email ? 'input-error' : ''}`}
               placeholder="email@example.com"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              aria-invalid={Boolean(errors.email)}
+              {...register('email')}
             />
+            {errors.email && <p className="form-error">{errors.email.message}</p>}
           </div>
 
           <div className="form-group">
@@ -83,10 +94,10 @@ export default function LoginPage() {
             <div className="input-wrapper">
               <input
                 type={showPassword ? 'text' : 'password'}
-                className="form-input"
+                className={`form-input ${errors.password ? 'input-error' : ''}`}
                 placeholder="••••••••"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                aria-invalid={Boolean(errors.password)}
+                {...register('password')}
               />
               <button
                 type="button"
@@ -98,6 +109,7 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {errors.password && <p className="form-error">{errors.password.message}</p>}
           </div>
 
           <div style={{ textAlign: 'right', marginTop: '-0.5rem' }}>
@@ -106,8 +118,8 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
-            {loading ? <><span className="spinner" />Đang đăng nhập...</> : 'Đăng nhập'}
+          <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={isSubmitting}>
+            {isSubmitting ? <><span className="spinner" />Đang đăng nhập...</> : 'Đăng nhập'}
           </button>
         </form>
 

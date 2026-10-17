@@ -358,6 +358,32 @@
   gap: var(--space-5);
 }
 
+.manual-skill-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 170px 110px auto;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.manual-years-input { min-width: 0; }
+.manual-skill-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.manual-skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md);
+  background: rgba(99, 102, 241, 0.05);
+}
+.manual-skill-row > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.manual-skill-row strong { font-size: 0.88rem; }
+.manual-skill-row span { color: var(--text-muted); font-size: 0.75rem; }
+@media (max-width: 700px) {
+  .manual-skill-form { grid-template-columns: 1fr 1fr; }
+  .manual-skill-form .manual-years-input { width: 100%; }
+}
+
 .skill-cat-block { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .skill-cat-label {

@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.security import hash_password, verify_password, create_access_token, get_current_user
+from app.core.security import (
+    hash_password, verify_password, create_user_access_token, create_password_reset_token,
+    decode_token, token_user_id, password_reset_token_matches,
+)
 from app.models.user import User
 from app.models.profile import Profile
 from app.schemas.user import UserCreate, UserLogin, TokenResponse, UserResponse, ForgotPassword, ResetPassword
-from datetime import timedelta
-from app.core.security import decode_token
 from app.core.config import settings
 from app.core.rate_limit import rate_limit
 
@@ -38,7 +39,7 @@ def register(
     db.commit()
     db.refresh(user)
 
-    token = create_access_token({"sub": str(user.id)})
+    token = create_user_access_token(user.id, user.password_hash)
     return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
 
 
@@ -55,7 +56,7 @@ def login(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Tài khoản đã bị khóa")
 
-    token = create_access_token({"sub": str(user.id)})
+    token = create_user_access_token(user.id, user.password_hash)
     return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
 @router.post("/logout")
 def logout():
@@ -72,9 +73,9 @@ def forgot_password(
 ):
     user = db.query(User).filter(User.email == payload.email).first()
     response = {"message": "If the email exists, recovery instructions will be sent."}
-    if not user:
+    if not user or not user.is_active:
         return response
-    reset_token = create_access_token({"sub": str(user.id), "purpose": "reset"}, expires_delta=timedelta(minutes=15))
+    reset_token = create_password_reset_token(user.id, user.password_hash)
     if settings.ALLOW_DEV_RESET_TOKEN and settings.ENVIRONMENT.lower() not in {"production", "prod"}:
         response["devResetToken"] = reset_token
     return response
@@ -88,15 +89,26 @@ def reset_password(
 ):
     """Đặt lại mật khẩu."""
     payload_data = decode_token(payload.token)
-    if not payload_data or payload_data.get("purpose") != "reset":
-        raise HTTPException(status_code=400, detail="Token không hợp lệ hoặc đã hết hạn")
+    invalid_token = HTTPException(status_code=400, detail="Token không hợp lệ hoặc đã hết hạn")
+    user_id = token_user_id(payload_data, "reset")
+    if user_id is None:
+        raise invalid_token
 
-    user_id = payload_data.get("sub")
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    if not user:
-        raise HTTPException(status_code=400, detail="Người dùng không tồn tại")
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if (
+        not user
+        or not user.is_active
+        or not password_reset_token_matches(payload_data, user.id, user.password_hash)
+    ):
+        raise invalid_token
 
     user.password_hash = hash_password(payload.new_password)
     db.commit()
 
-    return {"message": "Đặt lại mật khẩu thành công"}
+    return {"message": "Đặt lại mật khẩu thành công", "user_id": user.id}

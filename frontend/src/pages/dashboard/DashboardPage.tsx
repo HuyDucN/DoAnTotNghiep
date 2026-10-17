@@ -1,10 +1,12 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
 import { cvApi, jobsApi } from '../../services/api';
 import type { CV, SkillGapResult } from '../../types';
-import { FileText, Briefcase, TrendingUp, Star, ArrowRight, Loader2, Clock, AlertCircle, RefreshCw } from 'lucide-react';
+import CvMatchStatusBadge from '../../components/CvMatchStatusBadge';
+import QueryLoadNotice from '../../components/QueryLoadNotice';
+import { FileText, Briefcase, TrendingUp, Star, ArrowRight, Loader2, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import './Dashboard.css';
 
 interface DashboardStats {
@@ -20,57 +22,44 @@ interface DashboardStats {
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalCvs: 0,
-    analyzedCvs: 0,
-    processingCvs: 0,
-    totalMatches: 0,
-    avgMatchScore: 0,
-    bestMatch: null,
-    recentGaps: [],
+
+  const cvsQuery = useQuery<CV[]>({
+    queryKey: ['cvs', 'mine'],
+    queryFn: () => cvApi.list(),
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      setError(false);
-      try {
-        const [cvsData, gapsData] = await Promise.all([
-          cvApi.list(),
-          jobsApi.getGapHistory(),
-        ]);
+  const gapsQuery = useQuery<SkillGapResult[]>({
+    queryKey: ['skill-gaps', 'mine'],
+    queryFn: () => jobsApi.getGapHistory(),
+  });
 
-        const cvs: CV[] = cvsData;
-        const gaps: SkillGapResult[] = gapsData;
+  const hasCvs = cvsQuery.data !== undefined;
+  const hasGaps = gapsQuery.data !== undefined;
 
-        const analyzedCvs = cvs.filter((c) => c.status === 'analyzed').length;
-        const processingCvs = cvs.filter((c) => c.status === 'processing' || c.status === 'uploaded').length;
-        const avgScore = gaps.length > 0
-          ? Math.round(gaps.reduce((sum, g) => sum + g.match_score, 0) / gaps.length * 10) / 10
-          : 0;
-        const bestMatch = gaps.length > 0
-          ? gaps.reduce((best, g) => g.match_score > best.match_score ? g : best, gaps[0])
-          : null;
+  const stats = useMemo<DashboardStats>(() => {
+    const cvs = cvsQuery.data ?? [];
+    const gaps = gapsQuery.data ?? [];
+    const analyzedCvs = cvs.filter((cv) => cv.status === 'analyzed').length;
+    const processingCvs = cvs.filter(
+      (cv) => cv.status === 'processing' || cv.status === 'uploaded',
+    ).length;
+    const avgScore = gaps.length > 0
+      ? Math.round(gaps.reduce((sum, gap) => sum + gap.match_score, 0) / gaps.length * 10) / 10
+      : 0;
+    const bestMatch = gaps.length > 0
+      ? gaps.reduce((best, gap) => gap.match_score > best.match_score ? gap : best, gaps[0])
+      : null;
 
-        setStats({
-          totalCvs: cvs.length,
-          analyzedCvs,
-          processingCvs,
-          totalMatches: gaps.length,
-          avgMatchScore: avgScore,
-          bestMatch,
-          recentGaps: gaps.slice(0, 5),
-        });
-      } catch {
-        setError(true);
-        toast.error('Không thể tải dữ liệu dashboard. Kiểm tra kết nối server.');
-      } finally {
-        setLoading(false);
-      }
+    return {
+      totalCvs: cvs.length,
+      analyzedCvs,
+      processingCvs,
+      totalMatches: gaps.length,
+      avgMatchScore: avgScore,
+      bestMatch,
+      recentGaps: gaps.slice(0, 5),
     };
-    fetchStats();
-  }, []);
+  }, [cvsQuery.data, gapsQuery.data]);
 
   const getScoreColor = (score: number) => {
     if (score >= 75) return 'text-success';
@@ -93,9 +82,13 @@ export default function DashboardPage() {
         <div className="welcome-text">
           <h2>{greeting}, <span className="text-brand">{user?.full_name}</span> 👋</h2>
           <p className="text-secondary">
-            {stats.analyzedCvs > 0
-              ? `Bạn có ${stats.analyzedCvs} CV đã phân tích và ${stats.totalMatches} lần so khớp công việc.`
-              : 'Tải lên CV đầu tiên của bạn để bắt đầu phân tích kỹ năng bằng AI.'}
+            {!hasCvs
+              ? cvsQuery.isPending ? 'Đang tải thông tin CV của bạn...' : 'Chưa tải được thông tin CV của bạn. Vui lòng thử lại bên dưới.'
+              : stats.analyzedCvs > 0
+                ? `Bạn có ${stats.analyzedCvs} CV đã phân tích${hasGaps ? ` và ${stats.totalMatches} kết quả so khớp công việc` : ''}.`
+                : stats.totalCvs > 0
+                  ? 'Theo dõi trạng thái phân tích CV của bạn bên dưới.'
+                  : cvsQuery.isSuccess ? 'Tải lên CV đầu tiên của bạn để bắt đầu phân tích kỹ năng bằng AI.' : 'Chưa xác nhận được danh sách CV mới nhất.'}
           </p>
           {stats.processingCvs > 0 && (
             <p className="text-warning" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
@@ -103,22 +96,15 @@ export default function DashboardPage() {
             </p>
           )}
         </div>
-        {stats.totalCvs === 0 && !loading && (
+        {cvsQuery.isSuccess && stats.totalCvs === 0 && (
           <button className="btn btn-primary" onClick={() => navigate('/cv')}>
             Bắt đầu ngay <ArrowRight size={16} />
           </button>
         )}
       </div>
 
-      {error && (
-        <div className="card" style={{ textAlign: 'center', padding: '2rem', borderColor: 'rgba(239,68,68,0.3)' }}>
-          <AlertCircle size={32} className="text-danger" style={{ margin: '0 auto 0.75rem' }} />
-          <p className="text-danger" style={{ marginBottom: '1rem' }}>Không thể tải dữ liệu. Kiểm tra backend server.</p>
-          <button className="btn btn-outline btn-sm" onClick={() => window.location.reload()}>
-            <RefreshCw size={14} /> Thử lại
-          </button>
-        </div>
-      )}
+      <QueryLoadNotice query={cvsQuery} label="danh sách CV" />
+      <QueryLoadNotice query={gapsQuery} label="kết quả so khớp" />
 
       <div className="overview-grid">
         <article className="mini-metric card">
@@ -128,7 +114,9 @@ export default function DashboardPage() {
               <FileText size={20} />
             </div>
           </div>
-          {loading ? <div className="metric-value"><Loader2 className="animate-spin" size={28} /></div> : (
+          {cvsQuery.isPending ? <div className="metric-value"><Loader2 className="animate-spin" size={28} /></div> : !hasCvs ? (
+            <><div className="metric-value">—</div><p className="text-muted text-xs">Chưa tải được danh sách CV</p></>
+          ) : (
             <>
               <div className="metric-value">{stats.analyzedCvs}</div>
               <div className="metric-trend text-muted">
@@ -140,12 +128,14 @@ export default function DashboardPage() {
 
         <article className="mini-metric card">
           <div className="metric-header">
-            <span className="metric-title text-success">Lần so khớp</span>
+            <span className="metric-title text-success">Kết quả so khớp</span>
             <div className="metric-icon bg-success-light text-success">
               <Briefcase size={20} />
             </div>
           </div>
-          {loading ? <div className="metric-value"><Loader2 className="animate-spin" size={28} /></div> : (
+          {gapsQuery.isPending ? <div className="metric-value"><Loader2 className="animate-spin" size={28} /></div> : !hasGaps ? (
+            <><div className="metric-value">—</div><p className="text-muted text-xs">Chưa tải được kết quả</p></>
+          ) : (
             <>
               <div className="metric-value">{stats.totalMatches}</div>
               <div className="metric-trend text-muted">
@@ -162,10 +152,12 @@ export default function DashboardPage() {
               <TrendingUp size={20} />
             </div>
           </div>
-          {loading ? <div className="metric-value"><Loader2 className="animate-spin" size={28} /></div> : (
+          {gapsQuery.isPending ? <div className="metric-value"><Loader2 className="animate-spin" size={28} /></div> : !hasGaps ? (
+            <><div className="metric-value">—</div><p className="text-muted text-xs">Chưa tải được kết quả</p></>
+          ) : (
             <>
-              <div className={`metric-value ${stats.avgMatchScore > 0 ? getScoreColor(stats.avgMatchScore) : ''}`}>
-                {stats.avgMatchScore > 0 ? `${stats.avgMatchScore}%` : '—'}
+              <div className={`metric-value ${stats.totalMatches > 0 ? getScoreColor(stats.avgMatchScore) : ''}`}>
+                {stats.totalMatches > 0 ? `${stats.avgMatchScore}%` : '—'}
               </div>
               <div className="metric-trend text-muted">
                 <span>{stats.totalMatches > 0 ? 'Trung bình tất cả vị trí' : 'Chưa có dữ liệu'}</span>
@@ -181,7 +173,9 @@ export default function DashboardPage() {
               <Star size={20} />
             </div>
           </div>
-          {loading ? <div className="metric-value"><Loader2 className="animate-spin" size={28} /></div> : (
+          {gapsQuery.isPending ? <div className="metric-value"><Loader2 className="animate-spin" size={28} /></div> : !hasGaps ? (
+            <><div className="metric-value">—</div><p className="text-muted text-xs">Chưa tải được kết quả</p></>
+          ) : (
             <>
               <div className={`metric-value ${stats.bestMatch ? getScoreColor(stats.bestMatch.match_score) : ''}`}>
                 {stats.bestMatch ? `${stats.bestMatch.match_score}%` : '—'}
@@ -190,7 +184,18 @@ export default function DashboardPage() {
                 <span className="truncate" style={{ maxWidth: '140px', display: 'inline-block' }}>
                   {stats.bestMatch ? stats.bestMatch.job.title : 'Chưa có dữ liệu'}
                 </span>
+                {stats.bestMatch && !stats.bestMatch.job_snapshot_available && (
+                  <span className="text-xs"> · Thông tin công việc hiện tại</span>
+                )}
               </div>
+              {stats.bestMatch && (
+                <>
+                  <p className="text-muted text-xs truncate" title={`CV #${stats.bestMatch.cv_id} · ${stats.bestMatch.cv_filename}`}>
+                    CV #{stats.bestMatch.cv_id} · {stats.bestMatch.cv_filename}
+                  </p>
+                  <CvMatchStatusBadge status={gapsQuery.isError ? 'unknown' : stats.bestMatch.cv_match_status} />
+                </>
+              )}
             </>
           )}
         </article>
@@ -199,14 +204,16 @@ export default function DashboardPage() {
       <div className="dashboard-grid">
         <div className="card">
           <div className="panel-header">
-            <h3>Lịch sử phân tích gần đây</h3>
+            <h3>Kết quả so khớp gần đây</h3>
             <button className="btn btn-ghost btn-sm" onClick={() => navigate('/reports')}>
               Xem tất cả <ArrowRight size={14} />
             </button>
           </div>
 
-          {loading ? (
+          {gapsQuery.isPending ? (
             <div className="flex justify-center p-8"><Loader2 className="animate-spin text-brand" size={24} /></div>
+          ) : (!hasGaps || (gapsQuery.isError && stats.recentGaps.length === 0)) ? (
+            <p className="text-muted text-sm" role="status">Chưa tải được kết quả so khớp. Vui lòng thử tải lại ở thông báo phía trên.</p>
           ) : stats.recentGaps.length === 0 ? (
             <div className="empty-state" style={{ padding: '32px 0' }}>
               <Briefcase size={36} className="text-muted mb-3" />
@@ -221,10 +228,16 @@ export default function DashboardPage() {
                 <div key={gap.id} className="gap-history-item">
                   <div className="gap-job-info">
                     <h4>{gap.job.title}</h4>
+                    <p className="text-muted text-xs truncate" title={`CV #${gap.cv_id} · ${gap.cv_filename}`}>
+                      CV #{gap.cv_id} · {gap.cv_filename}
+                    </p>
                     <span className="text-muted text-xs">
                       <Clock size={12} className="inline mr-1" />
-                      {new Date(gap.created_at).toLocaleDateString('vi-VN')}
+                      {gap.matched_at ? 'So khớp: ' : 'Tạo bản ghi: '}
+                      {new Date(gap.matched_at ?? gap.created_at).toLocaleDateString('vi-VN')}
+                      {!gap.job_snapshot_available && ' · Thông tin công việc hiện tại'}
                     </span>
+                    <CvMatchStatusBadge status={gapsQuery.isError ? 'unknown' : gap.cv_match_status} />
                   </div>
                   <div className="gap-score-area">
                     <div className={`score-pill ${getScoreBadgeClass(gap.match_score)}`}>
@@ -284,3 +297,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

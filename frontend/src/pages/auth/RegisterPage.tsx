@@ -1,49 +1,57 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { authApi } from '../../services/api';
+import { authApi, getApiErrorMessage } from '../../services/api';
+import { fullNameSchema } from '../../validation/account';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import './AuthPage.css';
+
+const registerSchema = z.object({
+  full_name: fullNameSchema,
+  email: z.string().trim().email('Email không hợp lệ'),
+  password: z.string().min(8, 'Mật khẩu phải có ít nhất 8 ký tự'),
+  confirm: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
+}).refine((data) => data.password === data.confirm, {
+  path: ['confirm'],
+  message: 'Mật khẩu xác nhận không khớp',
+});
+
+type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '' });
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { full_name: '', email: '', password: '', confirm: '' },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.full_name.trim() || !form.email || !form.password) {
-      return toast.error('Vui lòng điền đầy đủ thông tin');
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      return toast.error('Email không hợp lệ');
-    }
-    if (form.password.length < 8) {
-      return toast.error('Mật khẩu phải có ít nhất 8 ký tự');
-    }
-    if (form.password !== form.confirm) {
-      return toast.error('Mật khẩu xác nhận không khớp');
-    }
-
-    setLoading(true);
+  const onSubmit = async (form: RegisterForm) => {
+    const sessionVersion = useAuthStore.getState().sessionVersion;
     try {
       const data = await authApi.register({
         full_name: form.full_name.trim(),
         email: form.email,
         password: form.password,
       });
+      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
       setAuth(data.user, data.access_token);
       toast.success('Tạo tài khoản thành công! 🎉');
       // Mới đăng ký luôn là user, navigate đúng role
       navigate(data.user.role === 'admin' ? '/admin' : '/dashboard');
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Đăng ký thất bại');
-    } finally {
-      setLoading(false);
+    } catch (err: unknown) {
+      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      toast.error(getApiErrorMessage(err, 'Đăng ký thất bại'));
     }
   };
 
@@ -77,27 +85,29 @@ export default function RegisterPage() {
         <h1 className="auth-title">Tạo tài khoản</h1>
         <p className="auth-subtitle">Bắt đầu hành trình phát triển kỹ năng với AI.</p>
 
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form onSubmit={handleSubmit(onSubmit)} className="auth-form" noValidate>
           <div className="form-group">
             <label className="form-label">Họ và tên</label>
             <input
               type="text"
-              className="form-input"
+              className={`form-input ${errors.full_name ? 'input-error' : ''}`}
               placeholder="Nguyễn Văn A"
-              value={form.full_name}
-              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+              aria-invalid={Boolean(errors.full_name)}
+              {...register('full_name')}
             />
+            {errors.full_name && <p className="form-error">{errors.full_name.message}</p>}
           </div>
 
           <div className="form-group">
             <label className="form-label">Email</label>
             <input
               type="email"
-              className="form-input"
+              className={`form-input ${errors.email ? 'input-error' : ''}`}
               placeholder="email@example.com"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              aria-invalid={Boolean(errors.email)}
+              {...register('email')}
             />
+            {errors.email && <p className="form-error">{errors.email.message}</p>}
           </div>
 
           <div className="form-group">
@@ -105,15 +115,16 @@ export default function RegisterPage() {
             <div className="input-wrapper">
               <input
                 type={showPassword ? 'text' : 'password'}
-                className="form-input"
+                className={`form-input ${errors.password ? 'input-error' : ''}`}
                 placeholder="Ít nhất 8 ký tự"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                aria-invalid={Boolean(errors.password)}
+                {...register('password')}
               />
               <button type="button" className="input-eye-btn" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {errors.password && <p className="form-error">{errors.password.message}</p>}
           </div>
 
           <div className="form-group">
@@ -121,19 +132,20 @@ export default function RegisterPage() {
             <div className="input-wrapper">
               <input
                 type={showConfirm ? 'text' : 'password'}
-                className="form-input"
+                className={`form-input ${errors.confirm ? 'input-error' : ''}`}
                 placeholder="Nhập lại mật khẩu"
-                value={form.confirm}
-                onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+                aria-invalid={Boolean(errors.confirm)}
+                {...register('confirm')}
               />
               <button type="button" className="input-eye-btn" onClick={() => setShowConfirm(!showConfirm)} tabIndex={-1}>
                 {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {errors.confirm && <p className="form-error">{errors.confirm.message}</p>}
           </div>
 
-          <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
-            {loading ? <><span className="spinner" />Đang tạo tài khoản...</> : 'Đăng ký'}
+          <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={isSubmitting}>
+            {isSubmitting ? <><span className="spinner" />Đang tạo tài khoản...</> : 'Đăng ký'}
           </button>
         </form>
 

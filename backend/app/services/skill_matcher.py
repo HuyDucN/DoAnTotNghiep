@@ -7,9 +7,57 @@ from sqlalchemy.orm import Session
 from app.models.cv import CV
 from app.models.job import Job, JobSkill
 from app.models.skill import CVSkill, Skill
+from app.services.skill_names import normalize_skill_name
 
 
-def calculate_match_score(cv: CV, job: Job, db: Session) -> dict:
+# Trọng số dùng trực tiếp từ JobSkill.importance. Required luôn nặng hơn
+# Preferred, đồng thời mức high/medium/low tạo khác biệt trong cùng nhóm.
+REQUIRED_WEIGHTS = {"high": 1.0, "medium": 0.8, "low": 0.6}
+PREFERRED_WEIGHTS = {"high": 0.5, "medium": 0.3, "low": 0.2}
+
+
+def _get_skill_weight(is_required: bool, importance: str) -> float:
+    weights = REQUIRED_WEIGHTS if is_required else PREFERRED_WEIGHTS
+    return weights.get(importance, weights["medium"])
+
+
+def _weighted_percentage(matched_weight: float, total_weight: float) -> float:
+    return round((matched_weight / total_weight) * 100, 1) if total_weight else 0.0
+
+
+def summarize_skill_groups(matched_skills: list, missing_skills: list, weak_skills: list) -> list[dict] | None:
+    """Tỷ lệ trọng số đạt theo importance, dùng các skill snapshot của kết quả.
+
+    Dữ liệu cũ thiếu thông tin trọng số không đủ để dựng biểu đồ đáng tin cậy.
+    Kỹ năng yếu và thiếu đều góp vào mẫu số, không góp vào phần đã đạt.
+    """
+    all_skills = matched_skills + missing_skills + weak_skills
+    if any("importance" not in skill or "is_required" not in skill for skill in all_skills):
+        return None
+    groups = {
+        importance: {"importance": importance, "matched_weight": 0.0, "total_weight": 0.0}
+        for importance in ("high", "medium", "low")
+    }
+    for is_matched, skills in ((True, matched_skills), (False, missing_skills), (False, weak_skills)):
+        for skill in skills:
+            importance = skill["importance"] if skill["importance"] in ("high", "medium", "low") else "medium"
+            weight = _get_skill_weight(skill["is_required"], importance)
+            group = groups[importance]
+            group["total_weight"] += weight
+            if is_matched:
+                group["matched_weight"] += weight
+    return [
+        {
+            "importance": group["importance"],
+            "matched_weight": round(group["matched_weight"], 4),
+            "total_weight": round(group["total_weight"], 4),
+            "score": _weighted_percentage(group["matched_weight"], group["total_weight"]),
+        }
+        for group in groups.values()
+    ]
+
+
+def calculate_match_score(cv: CV, job: Job, db: Session, *, cv_skills: List[CVSkill] | None = None) -> dict:
     """
     So khớp kỹ năng CV với Job.
     
@@ -21,22 +69,32 @@ def calculate_match_score(cv: CV, job: Job, db: Session) -> dict:
             "weak_skills": List[dict],
         }
     """
-    # Load CV skills
-    cv_skills: List[CVSkill] = (
-        db.query(CVSkill)
-        .join(Skill)
-        .filter(CVSkill.cv_id == cv.id)
-        .all()
-    )
+    # A caller holding row locks can supply those exact rows. An ordinary SELECT
+    # in MySQL REPEATABLE READ may otherwise read an earlier transaction snapshot.
+    if cv_skills is None:
+        cv_skills = (
+            db.query(CVSkill)
+            .join(Skill)
+            .filter(CVSkill.cv_id == cv.id)
+            .all()
+        )
 
-    # Build CV skill map: normalized_name → {level, years}
+    # Chuẩn hóa từ tên thật để khóa cũ (nodejs/c) không gây khớp sai.
     cv_skill_map = {}
     for cs in cv_skills:
-        cv_skill_map[cs.skill.normalized_name] = {
+        normalized = normalize_skill_name(cs.skill.name)
+        source = getattr(cs, "source", None)
+        previous = cv_skill_map.get(normalized)
+        # Hai bản ghi cũ có thể mang cùng tên chuẩn hóa nhưng khác khóa lưu.
+        # Giá trị người dùng sửa tay được ưu tiên bất kể thứ tự query trả về.
+        if previous and previous["source"] == "manual" and source != "manual":
+            continue
+        cv_skill_map[normalized] = {
             "skill_id": cs.skill.id,
             "skill_name": cs.skill.name,
             "proficiency_level": cs.proficiency_level,
             "years_experience": cs.years_experience,
+            "source": source,
         }
 
     # Separate required vs preferred job skills
@@ -56,7 +114,7 @@ def calculate_match_score(cv: CV, job: Job, db: Session) -> dict:
 
     # --- Process required skills ---
     for js in required_job_skills:
-        norm_name = js.skill.normalized_name
+        norm_name = normalize_skill_name(js.skill.name)
         cv_skill_data = cv_skill_map.get(norm_name)
 
         if cv_skill_data:
@@ -93,7 +151,7 @@ def calculate_match_score(cv: CV, job: Job, db: Session) -> dict:
 
     # --- Process preferred skills ---
     for js in preferred_job_skills:
-        norm_name = js.skill.normalized_name
+        norm_name = normalize_skill_name(js.skill.name)
         cv_skill_data = cv_skill_map.get(norm_name)
 
         if cv_skill_data:
@@ -115,16 +173,19 @@ def calculate_match_score(cv: CV, job: Job, db: Session) -> dict:
             })
 
     # --- Calculate Match Score ---
-    # Formula: weighted score
-    # Required skills weight = 1.0 each, Preferred skills weight = 0.3 each
-    total_weight = len(required_job_skills) * 1.0 + len(preferred_job_skills) * 0.3
+    # Formula: cộng trọng số riêng của từng JobSkill theo required + importance.
+    total_weight = sum(
+        _get_skill_weight(js.is_required, js.importance)
+        for js in job.job_skills
+    )
     if total_weight == 0:
         match_score = 0.0
     else:
-        matched_required = len([s for s in matched_skills if s["is_required"]])
-        matched_preferred = len([s for s in matched_skills if not s["is_required"]])
-        earned_weight = matched_required * 1.0 + matched_preferred * 0.3
-        match_score = round((earned_weight / total_weight) * 100, 1)
+        earned_weight = sum(
+            _get_skill_weight(skill["is_required"], skill["importance"])
+            for skill in matched_skills
+        )
+        match_score = _weighted_percentage(earned_weight, total_weight)
 
     # Sort missing skills by priority
     priority_order = {"high": 0, "medium": 1, "low": 2}

@@ -1,5 +1,7 @@
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { attachSessionInterceptors } from './sessionInterceptors';
+import type { AccountResponse, AccountUpdate } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -8,25 +10,36 @@ export const api = axios.create({
   timeout: 60000, // 60s — AI analysis có thể chậm
 });
 
-// Đính JWT vào mọi request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (!isAxiosError(error)) return fallback;
+  if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+    return 'Yêu cầu quá thời gian chờ. Vui lòng kiểm tra kết nối và thử lại.';
   }
-  return config;
-});
+  if (!error.response) return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng và backend.';
+  const detail: unknown = error.response.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.flatMap((item: unknown) => {
+      if (!item || typeof item !== 'object' || !('msg' in item) || typeof item.msg !== 'string') return [];
+      return [item.msg.replace(/^Value error, /, '')];
+    });
+    if (messages.length > 0) return [...new Set(messages)].join('. ');
+  }
+  if (error.response.status === 503) return 'Dữ liệu tạm thời không khả dụng. Vui lòng thử lại sau.';
+  if (error.response.status >= 500) return 'Máy chủ gặp lỗi. Vui lòng thử lại sau.';
+  return fallback;
+}
 
-// 401 global → xóa token và redirect về login
-api.interceptors.response.use(
-  (res) => res,
-  (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
+attachSessionInterceptors(
+  api,
+  () => {
+    const state = useAuthStore.getState();
+    return { version: state.sessionVersion, token: state.token };
+  },
+  () => {
+    useAuthStore.getState().logout();
+    window.location.href = '/login';
+  },
 );
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -44,11 +57,16 @@ export const authApi = {
     api.post('/auth/forgot-password', { email }).then((r) => r.data),
 
   resetPassword: (token: string, new_password: string) =>
-    api.post('/auth/reset-password', { token, new_password }).then((r) => r.data),
+    api.post<{ message: string; user_id: number }>('/auth/reset-password', { token, new_password }).then((r) => r.data),
 };
 
 // ── Users / Profile ──────────────────────────────────────────────────────────
 export const usersApi = {
+  getAccount: () => api.get<AccountResponse>('/users/me/account').then((r) => r.data),
+
+  updateAccount: (data: AccountUpdate) =>
+    api.put<AccountResponse>('/users/me/account', data).then((r) => r.data),
+
   // GET /users/me — lấy thông tin user từ JWT (không từ URL)
   getMe: () => api.get('/users/me').then((r) => r.data),
 
@@ -88,6 +106,13 @@ export const cvApi = {
 
   get: (id: number) => api.get(`/cv/${id}`).then((r) => r.data),
 
+  status: (id: number) => api.get(`/cv/${id}/status`).then((r) => r.data),
+
+  skills: (id: number) => api.get(`/cv/${id}/skills`).then((r) => r.data),
+  addSkill: (id: number, data: { skill_name: string; proficiency_level: string; years_experience: number }) =>
+    api.post(`/cv/${id}/skills`, data).then((r) => r.data),
+  deleteSkill: (id: number, skillId: number) => api.delete(`/cv/${id}/skills/${skillId}`),
+
   viewFile: async (id: number, filename: string) => {
     const response = await api.get(`/cv/${id}/file`, { responseType: 'blob' });
     const url = URL.createObjectURL(response.data);
@@ -104,7 +129,7 @@ export const cvApi = {
 
 // ── Jobs ──────────────────────────────────────────────────────────────────────
 export const jobsApi = {
-  list: (params?: { category?: string; level?: string; search?: string }) =>
+  list: (params?: { category?: string; level?: string; search?: string; page?: number; size?: number }) =>
     api.get('/jobs/', { params }).then((r) => r.data),
 
   get: (id: number) => api.get(`/jobs/${id}`).then((r) => r.data),
@@ -117,6 +142,10 @@ export const jobsApi = {
   getGapHistory: () => api.get('/jobs/history/gaps').then((r) => r.data),
 
   // Admin
+  listAdmin: (params?: { category?: string; search?: string; page?: number; size?: number }) =>
+    api.get('/jobs/admin/list', { params }).then((r) => r.data),
+  parseDescription: (description: string) =>
+    api.post('/jobs/admin/parse-description', { description }).then((r) => r.data),
   create: (data: object) => api.post('/jobs/admin', data).then((r) => r.data),
   update: (id: number, data: object) => api.put(`/jobs/admin/${id}`, data).then((r) => r.data),
   delete: (id: number) => api.delete(`/jobs/admin/${id}`),
@@ -124,7 +153,7 @@ export const jobsApi = {
 
 // ── Skills ────────────────────────────────────────────────────────────────────
 export const skillsApi = {
-  list: (params?: { category?: string; search?: string }) =>
+  list: (params?: { category?: string; search?: string; page?: number; size?: number }) =>
     api.get('/skills/', { params }).then((r) => r.data),
 
   // Admin
@@ -135,9 +164,11 @@ export const skillsApi = {
 };
 
 export const adminApi = {
-  users: () => api.get('/admin/users').then((r) => r.data),
+  users: (params?: { page?: number; size?: number; search?: string }) =>
+    api.get('/admin/users', { params }).then((r) => r.data),
   updateUserActive: (id: number, is_active: boolean) =>
     api.patch(`/admin/users/${id}/active`, { is_active }).then((r) => r.data),
-  cvs: () => api.get('/admin/cvs').then((r) => r.data),
+  cvs: (params?: { page?: number; size?: number }) =>
+    api.get('/admin/cvs', { params }).then((r) => r.data),
   deleteCv: (id: number) => api.delete(`/admin/cvs/${id}`),
 };

@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, JSON, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, JSON, Text, String, UniqueConstraint
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.mysql import DATETIME as MySQLDateTime
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -20,6 +21,10 @@ class SkillGap(Base):
     missing_skills = Column(JSON)   # [{"skill_id": 2, "skill_name": "Docker", "priority": "high", ...}]
     weak_skills = Column(JSON)      # [{"skill_id": 3, "skill_name": "SQL", "current_level": "beginner", ...}]
     ai_recommendation = Column(Text)  # AI-generated recommendation text
+    job_snapshot = Column(JSON, nullable=True)
+    cv_input_hash = Column(String(64), nullable=True)
+    # Store UTC explicitly; MySQL DATETIME does not preserve timezone metadata.
+    matched_at = Column(DateTime(timezone=True).with_variant(MySQLDateTime(fsp=6), "mysql"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
