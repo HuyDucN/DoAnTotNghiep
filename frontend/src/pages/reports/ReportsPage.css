@@ -63,6 +63,10 @@
   transition: background var(--duration-fast);
 }
 .report-row:hover { background: rgba(255,255,255,0.03); }
+.report-row:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -2px;
+}
 
 .report-job {
   flex: 1;

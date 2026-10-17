@@ -1,13 +1,22 @@
-﻿import { useState, useEffect, useMemo } from 'react';
-import { jobsApi, cvApi } from '../../services/api';
-import type { Job, CV, SkillGapResult } from '../../types';
+import { useState, useEffect, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { jobsApi, cvApi, getApiErrorMessage } from '../../services/api';
+import type { Job, CV, SkillGapResult, PaginatedResponse } from '../../types';
+import CvMatchStatusBadge from '../../components/CvMatchStatusBadge';
+import QueryLoadNotice from '../../components/QueryLoadNotice';
 import {
   Briefcase, MapPin, DollarSign, Search,
   Activity, Loader2, CheckCircle, XCircle,
-  AlertTriangle, Filter, ChevronDown,
+  AlertTriangle, Filter, ChevronDown, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import {
+  PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart,
+  ResponsiveContainer, Tooltip, Legend,
+} from 'recharts';
 import './JobsPage.css';
+import { createMatchRequestTracker, getVisibleMatchResult, getRecordedMatchResult } from './matchRequest';
+import type { MatchRequest, MatchOutcome } from './matchRequest';
 
 // Sửa nội dung giao diện để dùng tiếng Việt chuẩn.
 
@@ -32,75 +41,154 @@ function formatSalary(min?: number, max?: number) {
   return `${(min || max)!.toLocaleString()} USD`;
 }
 
+const PAGE_SIZE = 10;
+const EMPTY_JOBS: Job[] = [];
+const MATCH_HISTORY_KEY = ['skill-gaps', 'mine'] as const;
+
+function SkillGapRadar({ result }: { result: SkillGapResult }) {
+  const groups = result.skill_group_scores;
+  if (!groups || groups.every((group) => group.total_weight === 0)) return null;
+  const data = groups.map((group) => ({
+    importance: group.importance === 'high' ? 'Cao' : group.importance === 'medium' ? 'Trung bình' : 'Thấp',
+    requirement: group.total_weight > 0 ? 100 : 0,
+    candidate: group.score,
+  }));
+
+  return (
+    <div className="skill-radar-card">
+      <div className="skill-radar-heading">
+        <h4>Biểu đồ Skill Gap</h4>
+        <span className="text-muted text-xs">Theo mức độ quan trọng</span>
+      </div>
+      <div className="skill-radar-chart">
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart data={data} outerRadius="68%">
+            <PolarGrid stroke="rgba(148,163,184,0.25)" />
+            <PolarAngleAxis dataKey="importance" tick={{ fill: '#cbd5e1', fontSize: 12 }} />
+            <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+            <Radar name="Yêu cầu công việc" dataKey="requirement" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.12} />
+            <Radar name="CV tại lần so khớp" dataKey="candidate" stroke="#818cf8" fill="#818cf8" fillOpacity={0.35} />
+            <Tooltip formatter={(value) => `${value}%`} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-muted text-xs">
+        Mỗi nhóm thể hiện tỷ lệ trọng số kỹ năng đã đáp ứng. Kỹ năng cần nâng cao chưa được cộng điểm.
+      </p>
+    </div>
+  );
+}
+
 // Main component
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const queryClient = useQueryClient();
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [cvs, setCvs] = useState<CV[]>([]);
   const [selectedCvId, setSelectedCvId] = useState<number | ''>('');
-  const [loadingJobs, setLoadingJobs] = useState(true);
-  const [matching, setMatching] = useState(false);
-  const [matchResult, setMatchResult] = useState<SkillGapResult | null>(null);
-
+  const [matchOutcome, setMatchOutcome] = useState<MatchOutcome | null>(null);
+  const [pendingMatch, setPendingMatch] = useState<MatchRequest | null>(null);
+  const [requestTracker] = useState(createMatchRequestTracker);
   const [search, setSearch] = useState('');
   const [filterLevel, setFilterLevel] = useState('');
 
-  // Fetch data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [jobsData, cvsData] = await Promise.all([
-          jobsApi.list(),
-          cvApi.list(),
-        ]);
-        setJobs(jobsData);
+  const jobParams = {
+    page: currentPage,
+    size: PAGE_SIZE,
+    search: search.trim() || undefined,
+    level: filterLevel || undefined,
+  };
+  const jobsQuery = useQuery<PaginatedResponse<Job>>({
+    queryKey: ['jobs', jobParams],
+    queryFn: () => jobsApi.list(jobParams),
+  });
 
-        // Chỉ cho phép chọn CV đã được phân tích
-        const analyzedCvs: CV[] = cvsData.filter((c: CV) => c.status === 'analyzed');
-        setCvs(analyzedCvs);
-        if (analyzedCvs.length > 0) setSelectedCvId(analyzedCvs[0].id);
-      } catch {
-        toast.error('Không thể tải dữ liệu. Kiểm tra kết nối server.');
-      } finally {
-        setLoadingJobs(false);
+  const cvsQuery = useQuery<CV[]>({
+    queryKey: ['cvs', 'mine'],
+    queryFn: () => cvApi.list(),
+  });
+
+  const matchHistoryQuery = useQuery<SkillGapResult[]>({
+    queryKey: MATCH_HISTORY_KEY,
+    queryFn: () => jobsApi.getGapHistory(),
+    enabled: matchOutcome !== null,
+    staleTime: 0,
+  });
+
+  const jobsData = jobsQuery.data;
+  const jobs = jobsData?.items ?? EMPTY_JOBS;
+  const pagination = {
+    total: jobsData?.total ?? 0,
+    page: jobsData?.page ?? currentPage,
+    size: jobsData?.size ?? PAGE_SIZE,
+    pages: jobsData?.pages ?? 1,
+  };
+  const cvs = useMemo(
+    () => (cvsQuery.data ?? []).filter((cv) => cv.status === 'analyzed'),
+    [cvsQuery.data],
+  );
+  const loadingJobs = jobsQuery.isPending || cvsQuery.isPending;
+
+  const activeCv = cvs.find((cv) => cv.id === selectedCvId) ?? cvs[0];
+  const activeCvId = activeCv?.id ?? '';
+  const hasSelectedMatch = getVisibleMatchResult(matchOutcome, selectedJob?.id, activeCvId) !== null;
+  const matchResult = getRecordedMatchResult(matchOutcome, selectedJob?.id, activeCvId, matchHistoryQuery.data);
+  const matching = pendingMatch !== null && pendingMatch.jobId === selectedJob?.id && pendingMatch.cvId === activeCvId;
+
+  const clearMatch = () => {
+    requestTracker.invalidate();
+    setMatchOutcome(null);
+    setPendingMatch(null);
+  };
+  const selectJob = (job: Job) => {
+    clearMatch();
+    setSelectedJob(job);
+  };
+  const selectCv = (cvId: number) => {
+    clearMatch();
+    setSelectedCvId(cvId);
+  };
+
+  useEffect(() => () => requestTracker.invalidate(), [requestTracker]);
+
+  const matchMutation = useMutation<SkillGapResult, unknown, MatchRequest>({
+    mutationFn: ({ jobId, cvId }) =>
+      jobsApi.match(jobId, cvId),
+    onSuccess: (result, request) => {
+      // Yêu cầu cũ vẫn có thể đã lưu kết quả trên server, nên làm mới lịch sử.
+      if (!requestTracker.complete(request)) {
+        void queryClient.invalidateQueries({ queryKey: MATCH_HISTORY_KEY, exact: true });
+        return;
       }
-    };
-    fetchData();
-  }, []);
-
-  // Filtered jobs (search + level)
-  const filteredJobs = useMemo(() => {
-    let result = jobs;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (j) =>
-          j.title.toLowerCase().includes(q) ||
-          (j.company ?? '').toLowerCase().includes(q),
-      );
-    }
-    if (filterLevel) {
-      result = result.filter((j) => j.level === filterLevel);
-    }
-    return result;
-  }, [jobs, search, filterLevel]);
-
-  // Match CV with Job
-  const handleMatch = async () => {
-    if (!selectedJob) return toast.error('Vui lòng chọn một công việc.');
-    if (!selectedCvId) return toast.error('Vui lòng chọn CV đã phân tích.');
-
-    setMatching(true);
-    setMatchResult(null);
-    try {
-      const result = await jobsApi.match(selectedJob.id, Number(selectedCvId));
-      setMatchResult(result);
+      setPendingMatch(null);
+      const outcome = { request, result };
+      if (!getVisibleMatchResult(outcome, request.jobId, request.cvId)) {
+        setMatchOutcome(null);
+        void queryClient.invalidateQueries({ queryKey: MATCH_HISTORY_KEY, exact: true });
+        toast.error('Kết quả so khớp không đúng CV hoặc công việc đã chọn. Vui lòng thử lại.');
+        return;
+      }
+      // Bỏ bản đọc trước khi so khớp; chỉ hiển thị bản server trả sau lần lưu này.
+      void queryClient.resetQueries({ queryKey: MATCH_HISTORY_KEY, exact: true });
+      setMatchOutcome(outcome);
       toast.success('So khớp thành công!');
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Lỗi khi so khớp. Thử lại.');
-    } finally {
-      setMatching(false);
-    }
+    },
+    onError: (error, request) => {
+      if (!requestTracker.complete(request)) return;
+      setPendingMatch(null);
+      toast.error(getApiErrorMessage(error, 'Lỗi khi so khớp. Thử lại.'));
+    },
+  });
+
+  const handleMatch = () => {
+    if (matching) return;
+    if (!selectedJob) return toast.error('Vui lòng chọn một công việc.');
+    if (!activeCvId) return toast.error('Vui lòng chọn CV đã phân tích.');
+
+    const request = requestTracker.begin(selectedJob.id, Number(activeCvId));
+    setMatchOutcome(null);
+    setPendingMatch(request);
+    matchMutation.mutate(request);
   };
 
   // Render
@@ -118,7 +206,7 @@ export default function JobsPage() {
               placeholder="Tìm kiếm vị trí, công ty..."
               className="search-input"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
             />
           </div>
 
@@ -128,7 +216,7 @@ export default function JobsPage() {
             <select
               className="filter-select"
               value={filterLevel}
-              onChange={(e) => setFilterLevel(e.target.value)}
+              onChange={(e) => { setFilterLevel(e.target.value); setCurrentPage(1); }}
             >
               <option value="">Tất cả cấp độ</option>
               {Object.entries(LEVEL_LABELS).map(([v, l]) => (
@@ -138,32 +226,40 @@ export default function JobsPage() {
             <ChevronDown size={13} className="text-muted" />
           </div>
 
+          <QueryLoadNotice query={jobsQuery} label="danh sách công việc" />
+          <QueryLoadNotice query={cvsQuery} label="danh sách CV" />
+
           {/* Jobs count */}
           <p className="jobs-count text-muted text-xs mb-4">
-            {loadingJobs ? '...' : `${filteredJobs.length} vị trí`}
+            {loadingJobs ? '...' : jobsQuery.data !== undefined ? `${pagination.total} vị trí · Trang ${pagination.page}/${pagination.pages}` : '—'}
           </p>
 
           {loadingJobs ? (
             <div className="flex justify-center p-8">
               <Loader2 className="animate-spin text-brand" size={24} />
             </div>
-          ) : filteredJobs.length === 0 ? (
+          ) : !jobsQuery.isSuccess ? null : jobs.length === 0 ? (
             <div className="empty-state" style={{ minHeight: '200px' }}>
               <Briefcase size={36} className="text-muted" />
               <p className="text-muted text-sm">
-                {jobs.length === 0 ? 'Chưa có vị trí nào được đăng.' : 'Không tìm thấy vị trí phù hợp.'}
+                {search.trim() || filterLevel ? 'Không tìm thấy vị trí phù hợp.' : 'Chưa có vị trí nào được đăng.'}
               </p>
             </div>
           ) : (
             <div className="job-cards">
-              {filteredJobs.map((job) => (
+              {jobs.map((job) => (
                 <div
                   key={job.id}
                   className={`job-card${selectedJob?.id === job.id ? ' selected' : ''}`}
-                  onClick={() => { setSelectedJob(job); setMatchResult(null); }}
+                  onClick={() => selectJob(job)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && setSelectedJob(job)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      selectJob(job);
+                    }
+                  }}
                 >
                   <div className="job-card-header">
                     <h4>{job.title}</h4>
@@ -175,6 +271,31 @@ export default function JobsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {!loadingJobs && pagination.pages > 1 && (
+            <div className="pagination-controls">
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1 || jobsQuery.isFetching}
+                aria-label="Trang trước"
+              >
+                <ChevronLeft size={16} /> Trước
+              </button>
+              <span className="pagination-info text-muted text-xs">
+                {currentPage} / {pagination.pages}
+              </span>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setCurrentPage((p) => Math.min(pagination.pages, p + 1))}
+                disabled={currentPage >= pagination.pages || jobsQuery.isFetching}
+                aria-label="Trang sau"
+              >
+                Sau <ChevronRight size={16} />
+              </button>
             </div>
           )}
         </div>
@@ -209,23 +330,27 @@ export default function JobsPage() {
               {/* Match action */}
               <div className="match-action-area">
                 <p className="text-sm text-secondary" style={{ marginBottom: '0.75rem' }}>
-                  Chọn CV đã phân tích để AI tính điểm phù hợp với vị trí này:
+                  Chọn CV đã phân tích để so sánh kỹ năng với yêu cầu vị trí này:
                 </p>
                 <div className="match-controls">
                   <div className="form-group flex-1" style={{ marginBottom: 0 }}>
                     <label className="form-label">CV của bạn</label>
-                    {cvs.length === 0 ? (
+                    {!cvsQuery.isSuccess ? (
+                      <p className="text-warning text-sm">
+                        Chưa tải được danh sách CV. Hãy thử lại ở thông báo phía trên.
+                      </p>
+                    ) : cvs.length === 0 ? (
                       <p className="text-warning text-sm">
                         ⚠ Bạn chưa có CV nào được phân tích. Hãy tải CV lên ở trang <strong>CV của tôi</strong>.
                       </p>
                     ) : (
                       <select
                         className="form-input"
-                        value={selectedCvId}
-                        onChange={(e) => setSelectedCvId(Number(e.target.value))}
+                        value={activeCvId}
+                        onChange={(e) => selectCv(Number(e.target.value))}
                       >
                         {cvs.map((cv) => (
-                          <option key={cv.id} value={cv.id}>{cv.filename}</option>
+                          <option key={cv.id} value={cv.id}>{cv.filename} (CV #{cv.id})</option>
                         ))}
                       </select>
                     )}
@@ -233,7 +358,7 @@ export default function JobsPage() {
                   <button
                     className="btn btn-primary match-btn"
                     onClick={handleMatch}
-                    disabled={matching || !selectedCvId || cvs.length === 0}
+                    disabled={matching || !activeCvId || cvs.length === 0}
                   >
                     {matching
                       ? <><Loader2 className="animate-spin" size={16} /> Đang phân tích...</>
@@ -244,6 +369,27 @@ export default function JobsPage() {
               </div>
 
               {/* Match result */}
+              {hasSelectedMatch && !matchResult && (matchHistoryQuery.isPending || matchHistoryQuery.isFetching) && (
+                <div className="match-result-area flex items-center gap-2" role="status">
+                  <Loader2 className="animate-spin" size={18} /> Đang tải kết quả đã lưu...
+                </div>
+              )}
+              {hasSelectedMatch && matchHistoryQuery.isError && (
+                <div className="match-result-area" role="alert">
+                  <p className="text-warning text-sm">
+                    Đã lưu kết quả so khớp nhưng chưa tải được dữ liệu mới nhất.{' '}
+                    {getApiErrorMessage(matchHistoryQuery.error, 'Vui lòng thử tải lại.')}
+                  </p>
+                  <button className="btn btn-outline btn-sm mt-3" onClick={() => void matchHistoryQuery.refetch()}>
+                    Thử tải lại kết quả
+                  </button>
+                </div>
+              )}
+              {hasSelectedMatch && matchHistoryQuery.isSuccess && !matchHistoryQuery.isFetching && !matchResult && (
+                <p className="match-result-area text-warning text-sm" role="status">
+                  Kết quả đã lưu không còn trong danh sách hiện tại. Vui lòng tải lại danh sách CV và so khớp lại.
+                </p>
+              )}
               {matchResult && (
                 <div className="match-result-area animate-fade-in">
                   {/* Score header */}
@@ -267,11 +413,12 @@ export default function JobsPage() {
                         <span>Match</span>
                       </div>
                     </div>
-                    <div>
+                    <div className="match-score-details">
                       <h3>Kết quả phân tích</h3>
                       <p className="text-muted text-sm" style={{ marginTop: '0.25rem' }}>
-                        AI đã so sánh kỹ năng CV của bạn với yêu cầu vị trí <strong>{selectedJob.title}</strong>.
+                        Kết quả của <strong>CV #{matchResult.cv_id} · {matchResult.cv_filename}</strong> cho vị trí <strong>{matchResult.job.title}</strong>.
                       </p>
+                      <CvMatchStatusBadge status={matchResult.cv_match_status} detailed />
                       {/* Summary pills */}
                       <div className="score-pills">
                         <span className="score-pill-item success">
@@ -288,6 +435,11 @@ export default function JobsPage() {
                       </div>
                     </div>
                   </div>
+
+                  <SkillGapRadar result={matchResult} />
+                  {matchResult.skill_group_scores?.every((group) => group.total_weight === 0) && (
+                    <p className="text-muted text-sm">Công việc chưa khai báo kỹ năng để tính điểm phù hợp.</p>
+                  )}
 
                   {/* Skills comparison - 3 columns */}
                   <div className="skills-comparison">

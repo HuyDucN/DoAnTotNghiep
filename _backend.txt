@@ -1,9 +1,0 @@
-.env
-.env.example
-alembic
-app
-frontend@0.0.0
-npm
-requirements.txt
-uploads
-venv

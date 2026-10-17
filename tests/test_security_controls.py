@@ -4,7 +4,9 @@ import pytest
 from fastapi import HTTPException, Request
 
 from app.api.admin import ActiveUpdate, update_user_active
+from app.api.users import ActiveUpdate as LegacyActiveUpdate, update_user_active as update_user_active_legacy
 from app.core.rate_limit import rate_limit
+from app.core.security import get_current_employer
 from app.models.skill_gap import SkillGap
 
 
@@ -47,8 +49,14 @@ class FakeQuery:
     def filter(self, *_conditions):
         return self
 
+    def order_by(self, *_columns):
+        return self
+
+    def populate_existing(self):
+        return self
+
     def first(self):
-        return self.db.target
+        return self.db.actor if self.query_number == 2 else self.db.target
 
     def with_for_update(self):
         self.db.rows_locked = True
@@ -62,6 +70,7 @@ class FakeSession:
     def __init__(self, target, active_admins):
         self.target = target
         self.active_admins = active_admins
+        self.actor = SimpleNamespace(id=1, role="admin", is_active=True)
         self.query_count = 0
         self.rows_locked = False
         self.committed = False
@@ -110,6 +119,23 @@ def test_admin_cannot_disable_own_account():
     assert not db.committed
 
 
+def test_legacy_users_admin_endpoint_uses_same_last_admin_guard():
+    target = SimpleNamespace(id=2, role="admin", is_active=True)
+    db = FakeSession(target=target, active_admins=[target])
+
+    with pytest.raises(HTTPException) as error:
+        update_user_active_legacy(
+            user_id=target.id,
+            payload=LegacyActiveUpdate(is_active=False),
+            db=db,
+            current_admin=SimpleNamespace(id=1),
+        )
+
+    assert error.value.status_code == 400
+    assert db.rows_locked
+    assert not db.committed
+
+
 def test_skill_gap_has_database_uniqueness_constraint():
     unique_keys = {
         tuple(column.name for column in constraint.columns)
@@ -118,3 +144,13 @@ def test_skill_gap_has_database_uniqueness_constraint():
     }
 
     assert ("user_id", "cv_id", "job_id") in unique_keys
+
+
+def test_employer_dependency_accepts_only_employer_role():
+    employer = SimpleNamespace(role="employer")
+    assert get_current_employer(employer) is employer
+
+    with pytest.raises(HTTPException) as error:
+        get_current_employer(SimpleNamespace(role="user"))
+
+    assert error.value.status_code == 403

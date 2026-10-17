@@ -1,6 +1,8 @@
 """Seed tối thiểu cho môi trường phát triển; chạy thủ công sau migration."""
 from app.core.database import SessionLocal
-from app.models.skill import Skill
+# Đăng ký các model liên quan trước khi SQLAlchemy cấu hình relationship.
+from app.models import cv, job, profile, skill_gap, user
+from app.services.skill_catalog import get_or_create_skill
 
 SKILLS = [("Python", "programming_language"), ("FastAPI", "framework"), ("MySQL", "database")]
 
@@ -9,10 +11,11 @@ def main():
     db = SessionLocal()
     try:
         for name, category in SKILLS:
-            normalized = name.lower().replace(" ", "_")
-            if not db.query(Skill).filter(Skill.normalized_name == normalized).first():
-                db.add(Skill(name=name, normalized_name=normalized, category=category))
+            get_or_create_skill(db, name, category=category)
         db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

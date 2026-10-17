@@ -26,7 +26,8 @@
 - Ngưỡng năng lực tối thiểu theo cấp bậc: intern/fresher = beginner; junior/mid = intermediate; senior/lead = advanced.
 - Kỹ năng bắt buộc chỉ được tính là phù hợp khi có trong CV và đạt ngưỡng cấp bậc; kỹ năng yếu được ghi thành weak skill.
 - Kỹ năng ưu tiên được tính phù hợp khi có trong CV.
-- Điểm hiện tại là tỷ lệ trọng số kỹ năng đạt: bắt buộc 1.0 điểm mỗi kỹ năng, ưu tiên 0.3 điểm mỗi kỹ năng. Số năm kinh nghiệm được lưu trong kết quả nhưng chưa tham gia công thức điểm.
+- Điểm là tổng trọng số kỹ năng đạt chia tổng trọng số yêu cầu × 100, làm tròn một chữ số thập phân. Bắt buộc high/medium/low có trọng số 1.0/0.8/0.6; ưu tiên high/medium/low có trọng số 0.5/0.3/0.2. Kỹ năng yếu hoặc thiếu chưa được cộng điểm. Không có kỹ năng yêu cầu thì điểm bằng 0. Số năm kinh nghiệm được lưu trong kết quả nhưng chưa tham gia công thức điểm.
+- Biểu đồ dùng tỷ lệ trọng số từng nhóm do backend trả về; không tính kỹ năng yếu là nửa điểm. Dữ liệu cũ thiếu metadata không được dựng biểu đồ bằng giá trị suy đoán.
 
 ## API chính
 - `/api/auth`: register, login, logout, forgot-password, reset-password.

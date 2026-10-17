@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
-    # CÃ¡c model há»— trá»£: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo
+    # Các model hỗ trợ: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo
     OPENAI_MODEL: str = "gpt-4o-mini"
 
     # App

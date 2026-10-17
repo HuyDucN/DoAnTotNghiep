@@ -6,9 +6,12 @@
 # Python
 __pycache__/
 *.py[cod]
+.pytest_cache/
+venv/
+backend/venv/
 
 # Uploaded files
-src/backend/uploads/
+backend/uploads/
 
 # Node
 node_modules/

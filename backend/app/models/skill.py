@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Enum, Float
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Enum, Float, Boolean, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from app.core.database import Base
 
 
@@ -24,6 +25,8 @@ class Skill(Base):
         default="other",
     )
     description = Column(Text)
+    is_deleted = Column(Boolean, default=False, nullable=False)  # Soft Delete
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     cv_skills = relationship("CVSkill", back_populates="skill", cascade="all, delete-orphan")

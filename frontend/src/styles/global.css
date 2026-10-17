@@ -2,44 +2,44 @@
    AI CV Skill Gap — Design System
    ================================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
 
 /* ── Tokens ─────────────────────────────────────────────────── */
 :root {
   /* Brand */
-  --brand-primary: #6366f1;       /* Indigo */
-  --brand-primary-hover: #4f46e5;
-  --brand-primary-glow: rgba(99, 102, 241, 0.3);
-  --brand-secondary: #a855f7;     /* Purple */
-  --brand-accent: #0ea5e9;        /* Sky Blue */
+  --brand-primary: #2563eb;
+  --brand-primary-hover: #1d4ed8;
+  --brand-primary-glow: rgba(37, 99, 235, 0.1);
+  --brand-secondary: #475569;
+  --brand-accent: #0369a1;
 
   /* Semantic */
-  --color-success: #10b981;
+  --color-success: #15803d;
   --color-success-bg: rgba(16, 185, 129, 0.1);
-  --color-warning: #f59e0b;
+  --color-warning: #b45309;
   --color-warning-bg: rgba(245, 158, 11, 0.1);
-  --color-danger: #ef4444;
+  --color-danger: #dc2626;
   --color-danger-bg: rgba(239, 68, 68, 0.1);
-  --color-info: #3b82f6;
+  --color-info: #0369a1;
   --color-info-bg: rgba(59, 130, 246, 0.1);
 
-  /* Surfaces (Dark Slate Theme) */
-  --bg-base: #0f1115;          /* Deepest background */
-  --bg-surface: #14171d;       /* Slightly lighter */
-  --bg-elevated: #1a1e26;      /* Cards, panels */
-  --bg-card: rgba(26, 30, 38, 0.7); /* Glass card */
-  --bg-hover: #232832;         /* Hover state */
-  --bg-border: rgba(255, 255, 255, 0.06);
+  /* Light surfaces */
+  --bg-base: #f5f7fa;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-hover: #eef2f7;
+  --bg-border: #e2e7ef;
 
   /* Text */
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
+  --text-primary: #18243a;
+  --text-secondary: #526078;
   --text-muted: #64748b;
-  --text-inverse: #020617;
+  --text-inverse: #ffffff;
 
   /* Gradients */
-  --gradient-brand: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
-  --gradient-hero: linear-gradient(180deg, rgba(15,17,21,0) 0%, #0f1115 100%);
+  --gradient-brand: linear-gradient(var(--brand-primary), var(--brand-primary));
+  --gradient-hero: linear-gradient(#f5f7fa, #f5f7fa);
 
   /* Spacing */
   --space-1: 0.25rem;  /* 4px */
@@ -62,11 +62,11 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -1px rgba(0,0,0,0.3);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -2px rgba(0,0,0,0.3);
-  --shadow-glow: 0 0 20px var(--brand-primary-glow);
-  --shadow-glow-sm: 0 0 10px var(--brand-primary-glow);
+  --shadow-sm: 0 1px 3px rgba(24,36,58,0.04);
+  --shadow-md: 0 2px 8px rgba(24,36,58,0.04);
+  --shadow-lg: 0 16px 48px rgba(24,36,58,0.12);
+  --shadow-glow: none;
+  --shadow-glow-sm: none;
 
   /* Animation */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -82,7 +82,7 @@
 html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
   background: var(--bg-base);
   color: var(--text-primary);
   line-height: 1.6;

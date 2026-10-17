@@ -1,42 +1,115 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, or_
 from typing import List, Optional
+from datetime import datetime, timezone
 from app.core.database import get_db
 from app.core.security import get_current_user, get_current_admin
 from app.models.job import Job, JobSkill
-from app.models.skill import Skill
+from app.models.skill import Skill, CVSkill
 from app.models.cv import CV
 from app.models.skill_gap import SkillGap
 from app.models.user import User
-from app.schemas.job import JobCreate, JobUpdate, JobResponse, SkillGapResponse
-from app.services.skill_matcher import calculate_match_score
-from app.services.ai_analyzer import generate_recommendation
+from app.schemas.job import (
+    JobCreate, JobUpdate, JobResponse, SkillGapResponse, PaginatedResponse,
+    JobDescriptionParseRequest, JobDescriptionParseResponse, AdminJobListResponse,
+)
+from app.services.job_matching import match_with_current_data
+from app.services.match_history import skill_gap_response
+from app.services.ai_analyzer import generate_recommendation, parse_job_description_with_ai
+from app.services.skill_names import normalize_skill_name
+from app.services.skill_catalog import get_or_create_skill
 from app.core.rate_limit import rate_limit
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 
-@router.get("/", response_model=List[JobResponse])
-def list_jobs(
-    category: Optional[str] = None,
-    level: Optional[str] = None,
-    search: Optional[str] = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Danh sách tất cả job (có filter)."""
-    query = db.query(Job).options(joinedload(Job.job_skills).joinedload(JobSkill.skill))
-    query = query.filter(Job.is_active == True)
+def _repair_mojibake(value: Optional[str]) -> Optional[str]:
+    """Khôi phục chuỗi tiếng Việt bị đọc nhầm UTF-8 thành Latin-1."""
+    if not value or not any(marker in value for marker in ("Ã", "Â", "Ä", "á»", "Báº")):
+        return value
+    try:
+        return value.encode("cp1252").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return value
 
+
+def _get_or_restore_skill(db: Session, normalized: str, display_name: str) -> Skill:
+    """Lấy Skill hiện có hoặc khôi phục bản ghi đã xóa mềm.
+
+    normalized_name là UNIQUE nên không thể tạo một dòng mới có cùng tên sau
+    khi xóa mềm. Khôi phục dòng cũ cũng bảo toàn các liên kết lịch sử.
+    """
+    return get_or_create_skill(db, display_name)
+
+
+def _filter_jobs(query, category=None, level=None, search=None):
+    """Dùng chung bộ lọc cho danh sách ứng viên và danh sách quản trị."""
     if category:
         query = query.filter(Job.category == category)
     if level:
         query = query.filter(Job.level == level)
-    if search:
-        query = query.filter(Job.title.ilike(f"%{search}%"))
+    keyword = (search or "").strip()
+    if keyword:
+        # Tìm theo đúng văn bản nhập, kể cả ký tự %, _ và dấu escape.
+        escaped = keyword.replace("/", "//").replace("%", "/%").replace("_", "/_")
+        pattern = f"%{escaped}%"
+        query = query.filter(or_(
+            Job.title.ilike(pattern, escape="/"),
+            Job.company.ilike(pattern, escape="/"),
+        ))
+    return query
 
-    return query.order_by(Job.created_at.desc()).all()
+
+@router.get("/", response_model=PaginatedResponse[JobResponse])
+def list_jobs(
+    category: Optional[str] = None,
+    level: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = Query(default=1, ge=1, description="Trang hiện tại (bắt đầu từ 1)"),
+    size: int = Query(default=20, ge=1, le=100, description="Số bản ghi mỗi trang (tối đa 100)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Danh sách job đang tuyển dành cho ứng viên."""
+    query = db.query(Job).options(joinedload(Job.job_skills).joinedload(JobSkill.skill))
+    query = query.filter(Job.is_active == True, Job.is_deleted == False)
+    query = _filter_jobs(query, category=category, level=level, search=search)
+
+    total = query.count()
+    pages = max(1, -(-total // size))  # ceiling division
+    items = query.order_by(Job.created_at.desc(), Job.id.desc()).offset((page - 1) * size).limit(size).all()
+
+    return PaginatedResponse(items=items, total=total, page=page, size=size, pages=pages)
+
+
+@router.get("/admin/list", response_model=AdminJobListResponse)
+def list_admin_jobs(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """[Admin] Phân trang job chưa xóa, bao gồm cả job ngừng hoạt động."""
+    query = db.query(Job).filter(Job.is_deleted.is_(False))
+    query = _filter_jobs(query, category=category, search=search)
+    total = query.count()
+    active_total = query.filter(Job.is_active.is_(True)).count()
+    category_count = query.with_entities(func.count(func.distinct(Job.category))).scalar()
+    pages = max(1, -(-total // size))
+    # Trang cuối có thể mất sau khi xóa job; trả về trang cuối còn hợp lệ.
+    page = min(page, pages)
+    items = (
+        query.options(joinedload(Job.job_skills).joinedload(JobSkill.skill))
+        .order_by(Job.created_at.desc(), Job.id.desc())
+        .offset((page - 1) * size).limit(size).all()
+    )
+    return AdminJobListResponse(
+        items=items, total=total, page=page, size=size, pages=pages,
+        active_total=active_total, category_count=category_count,
+    )
 
 
 # Keep this static path before /{job_id}; otherwise "history" is parsed as an
@@ -46,13 +119,17 @@ def get_my_skill_gaps(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return (
+    gaps = (
         db.query(SkillGap)
-        .options(joinedload(SkillGap.job))
+        .options(joinedload(SkillGap.job), joinedload(SkillGap.cv).joinedload(CV.cv_skills).joinedload(CVSkill.skill))
         .filter(SkillGap.user_id == current_user.id)
-        .order_by(SkillGap.created_at.desc())
+        .order_by(SkillGap.matched_at.desc(), SkillGap.created_at.desc(), SkillGap.id.desc())
         .all()
     )
+    responses = [skill_gap_response(gap) for gap in gaps]
+    for response in responses:
+        response.ai_recommendation = _repair_mojibake(response.ai_recommendation)
+    return responses
 
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -65,7 +142,7 @@ def get_job(
     job = (
         db.query(Job)
         .options(joinedload(Job.job_skills).joinedload(JobSkill.skill))
-        .filter(Job.id == job_id, Job.is_active.is_(True))
+        .filter(Job.id == job_id, Job.is_active.is_(True), Job.is_deleted.is_(False))
         .first()
     )
     if not job:
@@ -82,82 +159,19 @@ def match_cv_with_job(
     _: None = Depends(rate_limit(20, 60)),
 ):
     """So sánh CV với Job → tính Match Score và Skill Gap."""
-    # Validate CV belongs to user
-    cv = db.query(CV).filter(CV.id == cv_id, CV.user_id == current_user.id).first()
-    if not cv:
-        raise HTTPException(status_code=404, detail="CV không tồn tại")
-    if cv.status != "analyzed":
-        raise HTTPException(status_code=400, detail="CV chưa được phân tích. Vui lòng chờ AI xử lý xong.")
-
-    # Validate job exists
-    job = (
-        db.query(Job)
-        .options(joinedload(Job.job_skills).joinedload(JobSkill.skill))
-        .filter(Job.id == job_id, Job.is_active.is_(True))
-        .first()
-    )
-    if not job:
-        raise HTTPException(status_code=404, detail="Job không tồn tại")
-
-    # Calculate match
-    result = calculate_match_score(cv, job, db)
-
-    # Generate AI recommendation
-    ai_rec = generate_recommendation(
-        cv_analysis=cv.ai_analysis,
-        missing_skills=result["missing_skills"],
-        job_title=job.title,
-    )
-
-    # Save or update skill gap record
-    existing = db.query(SkillGap).filter(
-        SkillGap.user_id == current_user.id,
-        SkillGap.cv_id == cv_id,
-        SkillGap.job_id == job_id,
-    ).first()
-
-    if existing:
-        existing.match_score = result["match_score"]
-        existing.matched_skills = result["matched_skills"]
-        existing.missing_skills = result["missing_skills"]
-        existing.weak_skills = result["weak_skills"]
-        existing.ai_recommendation = ai_rec
-        skill_gap = existing
-    else:
-        skill_gap = SkillGap(
-            user_id=current_user.id,
-            cv_id=cv_id,
-            job_id=job_id,
-            match_score=result["match_score"],
-            matched_skills=result["matched_skills"],
-            missing_skills=result["missing_skills"],
-            weak_skills=result["weak_skills"],
-            ai_recommendation=ai_rec,
-        )
-        db.add(skill_gap)
-
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        skill_gap = db.query(SkillGap).filter(
-            SkillGap.user_id == current_user.id,
-            SkillGap.cv_id == cv_id,
-            SkillGap.job_id == job_id,
-        ).first()
-        if not skill_gap:
-            raise
-        skill_gap.match_score = result["match_score"]
-        skill_gap.matched_skills = result["matched_skills"]
-        skill_gap.missing_skills = result["missing_skills"]
-        skill_gap.weak_skills = result["weak_skills"]
-        skill_gap.ai_recommendation = ai_rec
-        db.commit()
-    db.refresh(skill_gap)
-    return skill_gap
+    return match_with_current_data(db, current_user.id, cv_id, job_id, generate_recommendation)
 
 
 # Admin routes
+@router.post("/admin/parse-description", response_model=JobDescriptionParseResponse)
+def parse_job_description(
+    payload: JobDescriptionParseRequest,
+    _: User = Depends(get_current_admin),
+):
+    """[Admin] Bóc tách JD thành dữ liệu Job có cấu trúc bằng AI."""
+    return parse_job_description_with_ai(payload.description)
+
+
 @router.post("/admin", response_model=JobResponse, status_code=201)
 def create_job(
     payload: JobCreate,
@@ -185,12 +199,8 @@ def create_job(
     ] + [(s, False) for s in payload.preferred_skills]
 
     for skill_data, is_required in all_skills:
-        normalized = skill_data.skill_name.lower().replace(" ", "_").replace("-", "_")
-        skill = db.query(Skill).filter(Skill.normalized_name == normalized).first()
-        if not skill:
-            skill = Skill(name=skill_data.skill_name, normalized_name=normalized)
-            db.add(skill)
-            db.flush()
+        normalized = normalize_skill_name(skill_data.skill_name)
+        skill = _get_or_restore_skill(db, normalized, skill_data.skill_name)
 
         job_skill = JobSkill(
             job_id=job.id,
@@ -212,27 +222,25 @@ def update_job(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin),
 ):
-    """[Admin] Cập nhật Job."""
-    job = db.query(Job).filter(Job.id == job_id).first()
+    """[Admin] Cập nhật các trường được gửi; mỗi nhóm skill thay thế riêng."""
+    job = db.query(Job).filter(Job.id == job_id).with_for_update().first()
     if not job:
         raise HTTPException(status_code=404, detail="Job không tồn tại")
 
-    for field in ["title", "company", "location", "job_type", "level", "category", "description", "salary_min", "salary_max"]:
-        val = getattr(payload, field, None)
-        if val is not None:
-            setattr(job, field, val)
+    changes = payload.model_dump(exclude_unset=True, exclude={"required_skills", "preferred_skills"})
+    for field, value in changes.items():
+        setattr(job, field, value)
 
-    if payload.required_skills is not None or payload.preferred_skills is not None:
-        db.query(JobSkill).filter(JobSkill.job_id == job.id).delete(synchronize_session=False)
-        all_skills = ([(s, True) for s in payload.required_skills]
-                      + [(s, False) for s in payload.preferred_skills])
-        for skill_data, is_required in all_skills:
-            normalized = skill_data.skill_name.lower().replace(" ", "_").replace("-", "_")
-            skill = db.query(Skill).filter(Skill.normalized_name == normalized).first()
-            if not skill:
-                skill = Skill(name=skill_data.skill_name.strip(), normalized_name=normalized)
-                db.add(skill)
-                db.flush()
+    for field, is_required in (("required_skills", True), ("preferred_skills", False)):
+        if field not in payload.model_fields_set:
+            continue
+        db.query(JobSkill).filter(
+            JobSkill.job_id == job.id,
+            JobSkill.is_required.is_(is_required),
+        ).delete(synchronize_session="fetch")
+        for skill_data in getattr(payload, field):
+            normalized = normalize_skill_name(skill_data.skill_name)
+            skill = _get_or_restore_skill(db, normalized, skill_data.skill_name)
             db.add(JobSkill(job_id=job.id, skill_id=skill.id,
                             is_required=is_required, importance=skill_data.importance))
 
@@ -247,9 +255,12 @@ def delete_job(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin),
 ):
-    """[Admin] Xóa Job."""
-    job = db.query(Job).filter(Job.id == job_id).first()
+    """[Admin] Xóa mềm Job (Soft Delete — không xóa thật, bảo toàn lịch sử so khớp CV)."""
+    job = db.query(Job).filter(Job.id == job_id, Job.is_deleted == False).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job không tồn tại")
-    db.delete(job)
+    # Soft delete: chỉ ẩn, không xóa dữ liệu — giữ nguyên lịch sử SkillGap
+    job.is_deleted = True
+    job.deleted_at = datetime.now(timezone.utc)
+    job.is_active = False
     db.commit()

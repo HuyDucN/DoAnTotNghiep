@@ -1,10 +1,23 @@
+// ── Kiểu phân trang chung (dùng cho Jobs, CVs, Users) ────────────────────────
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;   // Tổng số bản ghi
+  page: number;    // Trang hiện tại
+  size: number;    // Số bản ghi mỗi trang
+  pages: number;   // Tổng số trang
+}
+
 export interface User {
   id: number;
   email: string;
   full_name: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'employer';
   is_active: boolean;
   created_at: string;
+}
+
+export interface AdminUserListResponse extends PaginatedResponse<User> {
+  active_total: number;
 }
 
 export interface Profile {
@@ -17,6 +30,21 @@ export interface Profile {
   avatar_url?: string;
   linkedin_url?: string;
   github_url?: string;
+}
+
+export interface AccountResponse {
+  user: User;
+  profile: Profile | null;
+}
+
+export interface AccountUpdate {
+  full_name?: string;
+  phone?: string | null;
+  location?: string | null;
+  job_title?: string | null;
+  bio?: string | null;
+  linkedin_url?: string | null;
+  github_url?: string | null;
 }
 
 export interface AuthResponse {
@@ -33,6 +61,21 @@ export interface CV {
   status: 'uploaded' | 'processing' | 'analyzed' | 'failed';
   ai_analysis?: CVAnalysis;
   created_at: string;
+}
+
+export interface CVStatus {
+  id: number;
+  status: 'uploaded' | 'processing' | 'analyzed' | 'failed';
+  updated_at?: string;
+}
+
+export interface CVSkillItem {
+  id: number;
+  skill_id: number;
+  skill_name: string;
+  proficiency_level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  years_experience: number;
+  source: 'ai_extracted' | 'manual' | string;
 }
 
 export interface CVAnalysis {
@@ -103,6 +146,11 @@ export interface Job {
   created_at: string;
 }
 
+export interface AdminJobListResponse extends PaginatedResponse<Job> {
+  active_total: number;
+  category_count: number;
+}
+
 export interface JobSkill {
   skill_id: number;
   skill_name: string;
@@ -110,15 +158,30 @@ export interface JobSkill {
   importance: 'high' | 'medium' | 'low';
 }
 
+export interface SkillGroupScore {
+  importance: 'high' | 'medium' | 'low';
+  matched_weight: number;
+  total_weight: number;
+  score: number;
+}
+
+export type CvMatchStatus = 'current' | 'changed' | 'processing' | 'failed' | 'unknown';
+
 export interface SkillGapResult {
   id: number;
+  cv_id: number;
+  cv_filename: string;
+  cv_match_status: CvMatchStatus;
   match_score: number;
   matched_skills: MatchedSkill[];
   missing_skills: MissingSkill[];
   weak_skills: WeakSkill[];
+  skill_group_scores?: SkillGroupScore[] | null;
   ai_recommendation?: string;
   job: Job;
   created_at: string;
+  matched_at?: string | null;
+  job_snapshot_available?: boolean;
 }
 
 export interface MatchedSkill {
@@ -160,4 +223,17 @@ export interface JobSkillInput {
   skill_name: string;
   is_required: boolean;
   importance: 'high' | 'medium' | 'low';
+}
+
+export interface JobDescriptionParseResult {
+  title: string;
+  company?: string | null;
+  location?: string | null;
+  job_type: 'full_time' | 'part_time' | 'internship' | 'freelance';
+  level: 'intern' | 'fresher' | 'junior' | 'mid' | 'senior' | 'lead';
+  category: 'backend' | 'frontend' | 'fullstack' | 'data' | 'ai_ml' | 'devops' | 'mobile' | 'qa' | 'other';
+  salary_min?: number | null;
+  salary_max?: number | null;
+  required_skills: JobSkillInput[];
+  preferred_skills: JobSkillInput[];
 }

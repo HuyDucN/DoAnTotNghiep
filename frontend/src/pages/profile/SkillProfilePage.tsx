@@ -1,11 +1,17 @@
 ﻿import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { usersApi, cvApi } from '../../services/api';
-import type { Profile, CV, CVAnalysis } from '../../types';
+import { useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { isCancel } from 'axios';
+import { usersApi, cvApi, getApiErrorMessage } from '../../services/api';
+import { cvSkillsKey, myCvsKey, syncCvSkillDeleted, syncCvSkillSaved } from '../../services/cvCache';
+import QueryLoadNotice from '../../components/QueryLoadNotice';
+import { z } from 'zod';
+import type { Profile, CV, CVAnalysis, CVSkillItem } from '../../types';
 import {
   MapPin, Briefcase, Mail, Phone, Award, Code,
   BookOpen, FileText, CheckCircle, XCircle, Loader2,
-  Clock, ChevronRight, Sparkles, FolderOpen, ChevronDown,
+  Clock, ChevronRight, Sparkles, FolderOpen, ChevronDown, Plus, Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './SkillProfile.css';
@@ -37,34 +43,106 @@ const CAT_LABELS: Record<string, string> = {
 };
 const CAT_ORDER = ['programming_language', 'framework', 'database', 'cloud', 'devops', 'ai_ml', 'soft_skill', 'tool', 'other'];
 
+const manualSkillSchema = z.object({
+  skill_name: z.string().refine((name) => !/\p{C}/u.test(name), 'Tên kỹ năng chứa ký tự không hợp lệ')
+    .transform((name) => name.normalize('NFKC').trim().replace(/\s+/g, ' '))
+    .pipe(z.string().min(1, 'Vui lòng nhập tên kỹ năng').max(255, 'Tên kỹ năng không được quá 255 ký tự'))
+    .refine((name) => /[\p{L}\p{N}]/u.test(name), 'Tên kỹ năng phải có ít nhất một chữ hoặc số'),
+  proficiency_level: z.enum(['beginner', 'intermediate', 'advanced', 'expert']),
+  years_experience: z.number({ error: 'Vui lòng nhập số năm kinh nghiệm hợp lệ' }).finite()
+    .min(0, 'Số năm kinh nghiệm không được âm').max(80, 'Số năm kinh nghiệm không được lớn hơn 80'),
+});
+
 export default function SkillProfilePage() {
   const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [analyzedCvs, setAnalyzedCvs] = useState<CV[]>([]);
   const [selectedCvId, setSelectedCvId] = useState<number | null>(null);
-  const [cvHistory, setCvHistory] = useState<CV[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [manualSkillName, setManualSkillName] = useState('');
+  const [manualLevel, setManualLevel] = useState<CVSkillItem['proficiency_level']>('intermediate');
+  const [manualYears, setManualYears] = useState('0');
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState('');
+  const manualRequestPending = useRef(false);
+  const cvsQuery = useQuery<CV[]>({ queryKey: myCvsKey, queryFn: () => cvApi.list() });
+  const cvHistory = cvsQuery.data ?? [];
+  const analyzedCvs = cvHistory.filter((cv) => cv.status === 'analyzed' && cv.ai_analysis);
+  const activeCv = analyzedCvs.find((cv) => cv.id === selectedCvId) ?? analyzedCvs[0] ?? null;
+  const activeCvId = activeCv?.id ?? null;
+  const manualSkillsQuery = useQuery<CVSkillItem[]>({
+    queryKey: cvSkillsKey(activeCvId),
+    queryFn: () => cvApi.skills(activeCvId!),
+    enabled: activeCvId !== null,
+  });
+  const manualSkills = manualSkillsQuery.data ?? [];
+  const manualLoading = manualSaving || manualSkillsQuery.isFetching;
+  const loading = profileLoading || cvsQuery.isPending;
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [profileData, cvsData] = await Promise.all([
-          usersApi.getProfile(),
-          cvApi.list(),
-        ]);
-        setProfile(profileData);
-        setCvHistory(cvsData);
-        const analyzed: CV[] = cvsData.filter((cv: CV) => cv.status === 'analyzed' && cv.ai_analysis);
-        setAnalyzedCvs(analyzed);
-        if (analyzed.length > 0) setSelectedCvId(analyzed[0].id);
-      } catch {
-        toast.error('Lỗi tải dữ liệu profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    let active = true;
+    usersApi.getProfile()
+      .then((data: Profile) => { if (active) setProfile(data); })
+      .catch((error: unknown) => {
+        if (active && !isCancel(error)) toast.error(getApiErrorMessage(error, 'Lỗi tải dữ liệu profile'));
+      })
+      .finally(() => { if (active) setProfileLoading(false); });
+    return () => { active = false; };
   }, []);
+
+  const addManualSkill = async () => {
+    if (manualLoading || manualRequestPending.current) return;
+    if (!activeCvId) { toast.error('Vui lòng chọn CV trước khi sửa kỹ năng'); return; }
+    const sessionVersion = useAuthStore.getState().sessionVersion;
+    const validated = manualSkillSchema.safeParse({
+      skill_name: manualSkillName,
+      proficiency_level: manualLevel,
+      years_experience: manualYears.trim() ? Number(manualYears) : Number.NaN,
+    });
+    if (!validated.success) {
+      setManualError(validated.error.issues.map((issue) => issue.message).join('. '));
+      return;
+    }
+    manualRequestPending.current = true;
+    setManualError('');
+    setManualSaving(true);
+    try {
+      const saved = await cvApi.addSkill(activeCvId, validated.data);
+      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      await syncCvSkillSaved(queryClient, activeCvId, saved);
+      setManualSkillName('');
+      setManualYears('0');
+      toast.success('Đã lưu kỹ năng thủ công');
+    } catch (error: unknown) {
+      if (isCancel(error) || useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      const message = getApiErrorMessage(error, 'Không thể lưu kỹ năng');
+      setManualError(message);
+      toast.error(message);
+    } finally {
+      manualRequestPending.current = false;
+      setManualSaving(false);
+    }
+  };
+
+  const removeManualSkill = async (skillId: number) => {
+    if (!activeCvId || manualLoading || manualRequestPending.current) return;
+    const sessionVersion = useAuthStore.getState().sessionVersion;
+    manualRequestPending.current = true;
+    setManualError('');
+    setManualSaving(true);
+    try {
+      await cvApi.deleteSkill(activeCvId, skillId);
+      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      await syncCvSkillDeleted(queryClient, activeCvId, skillId);
+      toast.success('Đã xóa kỹ năng khỏi CV');
+    } catch (error: unknown) {
+      if (isCancel(error) || useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      toast.error(getApiErrorMessage(error, 'Không thể xóa kỹ năng'));
+    } finally {
+      manualRequestPending.current = false;
+      setManualSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -75,7 +153,6 @@ export default function SkillProfilePage() {
     );
   }
 
-  const activeCv = analyzedCvs.find((c) => c.id === selectedCvId) ?? analyzedCvs[0] ?? null;
   const analysis: CVAnalysis | undefined = activeCv?.ai_analysis;
 
   const displayName = analysis?.full_name?.trim() || user?.full_name || 'Người dùng';
@@ -90,6 +167,7 @@ export default function SkillProfilePage() {
 
   return (
     <div className="skill-profile-page animate-fade-in">
+      <QueryLoadNotice query={cvsQuery} label="danh sách CV" />
       <div className="profile-hero card">
         <div className="profile-hero-bg" aria-hidden />
         <div className="profile-hero-body">
@@ -122,7 +200,8 @@ export default function SkillProfilePage() {
                   <FileText size={13} className="text-muted" />
                   <select
                     className="cv-selector-select"
-                    value={selectedCvId ?? ''}
+                    disabled={manualLoading}
+                    value={activeCvId ?? ''}
                     onChange={(e) => setSelectedCvId(Number(e.target.value))}
                   >
                     {analyzedCvs.map((cv) => (
@@ -159,7 +238,9 @@ export default function SkillProfilePage() {
               <span>Hồ sơ CV</span>
               <span className="sidebar-badge">{cvHistory.length}</span>
             </div>
-            {cvHistory.length === 0 ? (
+            {cvsQuery.isError && cvHistory.length === 0 ? (
+              <p className="text-warning text-xs sidebar-empty">Chưa tải được danh sách CV. Hãy thử lại ở thông báo phía trên.</p>
+            ) : cvsQuery.isSuccess && cvHistory.length === 0 ? (
               <p className="text-muted text-xs sidebar-empty">Chưa có CV nào.</p>
             ) : (
               <div className="cv-compact-list">
@@ -167,7 +248,7 @@ export default function SkillProfilePage() {
                   <div
                     key={cv.id}
                     className={`cv-compact-item${cv.id === (activeCv?.id) ? ' active' : ''}${cv.status === 'analyzed' ? ' clickable' : ''}`}
-                    onClick={() => cv.status === 'analyzed' && cv.ai_analysis && setSelectedCvId(cv.id)}
+                    onClick={() => !manualLoading && cv.status === 'analyzed' && cv.ai_analysis && setSelectedCvId(cv.id)}
                     title={cv.status === 'analyzed' ? 'Nhấn để xem CV này' : STATUS_LABEL[cv.status]}
                   >
                     <div className={`cv-status-dot status-${cv.status}`} />
@@ -270,6 +351,69 @@ export default function SkillProfilePage() {
                     })}
                   </div>
                 )}
+              </div>
+
+              <div className="card mt-4 manual-skills-card">
+                <div className="panel-header">
+                  <div className="flex items-center gap-2">
+                    <Plus size={17} className="text-brand" />
+                    <h3>Kỹ năng bổ sung thủ công</h3>
+                    <span className="count-chip">{manualSkills.length}</span>
+                  </div>
+                  <span className="text-muted text-xs">source: manual</span>
+                </div>
+
+                <QueryLoadNotice query={manualSkillsQuery} label="kỹ năng của CV" />
+
+                <div className="manual-skill-form">
+                  <input
+                    className="form-input"
+                    disabled={manualLoading}
+                    maxLength={255}
+                    aria-label="Tên kỹ năng"
+                    value={manualSkillName}
+                    onChange={(event) => setManualSkillName(event.target.value)}
+                    placeholder="Tên kỹ năng, ví dụ: Docker"
+                  />
+                  <select className="form-input" disabled={manualLoading} aria-label="Trình độ kỹ năng" value={manualLevel} onChange={(event) => setManualLevel(event.target.value as CVSkillItem['proficiency_level'])}>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                    <option value="expert">Expert</option>
+                  </select>
+                  <input
+                    className="form-input manual-years-input"
+                    disabled={manualLoading}
+                    type="number"
+                    min="0"
+                    max="80"
+                    step="0.5"
+                    value={manualYears}
+                    onChange={(event) => setManualYears(event.target.value)}
+                    aria-label="Số năm kinh nghiệm"
+                  />
+                  <button type="button" className="btn btn-primary" onClick={addManualSkill} disabled={manualLoading || !manualSkillName.trim()}>
+                    <Plus size={15} /> Thêm
+                  </button>
+                </div>
+                {manualError && <p className="form-error" role="alert">{manualError}</p>}
+                {manualSkillsQuery.isSuccess && manualSkills.length === 0 ? (
+                  <p className="text-muted text-sm">Chưa có kỹ năng thủ công nào cho CV này.</p>
+                ) : manualSkills.length > 0 ? (
+                  <div className="manual-skill-list">
+                    {manualSkills.map((skill) => (
+                      <div className="manual-skill-row" key={skill.skill_id}>
+                        <div>
+                          <strong>{skill.skill_name}</strong>
+                          <span>{skill.proficiency_level} · {skill.years_experience} năm · {skill.source}</span>
+                        </div>
+                        <button type="button" className="icon-btn danger" onClick={() => removeManualSkill(skill.skill_id)} disabled={manualLoading} aria-label={`Xóa ${skill.skill_name}`}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               {analysis!.experience && analysis!.experience.length > 0 && (
