@@ -22,11 +22,12 @@ export default function AppLayout() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#page-content">Đi đến nội dung chính</a>
       {role === 'user' && <CvAnalysisMonitor />}
       <Sidebar />
       <main className="main-panel">
         <Topbar />
-        <div className="page-content">
+        <div className="page-content" id="page-content" tabIndex={-1}>
           <Outlet />
         </div>
       </main>

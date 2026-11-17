@@ -43,7 +43,13 @@ def _stage_cv_file(file_path: str) -> Optional[tuple[Path, Path]]:
         raise HTTPException(status_code=503, detail="Chưa thể xử lý file CV để xóa. Vui lòng thử lại sau.") from error
 
 
-def delete_stored_cv(cv_id: int, db: Session, owner_id: Optional[int] = None) -> None:
+def delete_stored_cv(
+    cv_id: int,
+    db: Session,
+    owner_id: Optional[int] = None,
+    audit_actor_id: Optional[int] = None,
+    audit_action: str = "cv.delete",
+) -> None:
     query = db.query(CV).filter(CV.id == cv_id)
     if owner_id is not None:
         query = query.filter(CV.user_id == owner_id)
@@ -54,6 +60,9 @@ def delete_stored_cv(cv_id: int, db: Session, owner_id: Optional[int] = None) ->
     staged_file = _stage_cv_file(cv.file_path)
     try:
         db.delete(cv)
+        if audit_actor_id is not None:
+            from app.services.audit import log_audit
+            log_audit(db, audit_actor_id, audit_action, target_type="cv", target_id=cv_id)
         db.commit()
     except Exception:
         try:

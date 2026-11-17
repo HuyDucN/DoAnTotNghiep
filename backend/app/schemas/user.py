@@ -6,7 +6,7 @@ from pydantic import (
     BaseModel, ConfigDict, EmailStr, HttpUrl, TypeAdapter, ValidationError,
     ValidationInfo, field_validator,
 )
-from typing import Optional
+from typing import List, Literal, Optional
 from datetime import datetime
 from app.schemas.job import PaginatedResponse
 
@@ -37,6 +37,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: str
+    role: Optional[Literal["user", "recruiter"]] = "user"
 
     @field_validator("password")
     @classmethod
@@ -73,6 +74,59 @@ class UserActiveUpdate(BaseModel):
     is_active: bool
 
 
+class UserVerifyUpdate(BaseModel):
+    """Admin duyệt hoặc thu hồi quyền nhà tuyển dụng."""
+    is_verified: bool
+
+
+class AuditLogResponse(BaseModel):
+    id: int
+    actor_id: Optional[int] = None
+    actor_email: Optional[str] = None
+    action: str
+    target_type: Optional[str] = None
+    target_id: Optional[int] = None
+    detail: Optional[dict] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PaginatedAuditLogResponse(PaginatedResponse["AuditLogResponse"]):
+    pass
+
+
+class TopRecruiter(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    job_count: int
+
+
+class OverviewStatsResponse(BaseModel):
+    """Thống kê vận hành toàn hệ thống cho admin."""
+
+    period_days: int
+    totals: dict[str, int]
+    new_in_period: dict[str, int]
+    users_by_role: dict[str, int]
+    cvs_by_status: dict[str, int]
+    matches_by_review_status: dict[str, int]
+    top_recruiters: List["TopRecruiter"] = []
+    top_missing_skills: List[dict] = []
+    top_weak_skills: List[dict] = []
+
+
+class RecruiterOverviewResponse(BaseModel):
+    """Thống kê nhanh cho recruiter."""
+
+    total_jobs: int
+    total_applicants: int
+    pending_review: int
+    recent_jobs: List[dict] = []
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -85,6 +139,7 @@ class UserResponse(BaseModel):
     full_name: str
     role: str
     is_active: bool
+    is_verified: bool = True
     created_at: datetime
 
     class Config:

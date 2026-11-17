@@ -18,6 +18,7 @@ from app.models.user import User
 from app.schemas.job import PaginatedResponse
 from app.services.skill_names import normalize_skill_name, validate_skill_name
 from app.services.skill_catalog import find_skill_by_name
+from app.services.audit import log_audit
 
 router = APIRouter(prefix="/skills", tags=["Skills"])
 
@@ -107,7 +108,7 @@ def list_skills(
 def create_skill(
     payload: SkillCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_admin),
+    current_admin: User = Depends(get_current_admin),
 ):
     """[Admin] Thêm kỹ năng mới vào danh sách chuẩn hóa."""
     if payload.category not in VALID_CATEGORIES:
@@ -126,7 +127,10 @@ def create_skill(
         existing.description = payload.description
         existing.is_deleted = False
         existing.deleted_at = None
-        return _commit_skill(db, existing)
+        result = _commit_skill(db, existing)
+        log_audit(db, current_admin.id, "skill.restore", target_type="skill", target_id=result.id)
+        db.commit()
+        return result
 
     skill = Skill(
         name=payload.name.strip(),
@@ -135,7 +139,10 @@ def create_skill(
         description=payload.description,
     )
     db.add(skill)
-    return _commit_skill(db, skill)
+    result = _commit_skill(db, skill)
+    log_audit(db, current_admin.id, "skill.create", target_type="skill", target_id=result.id)
+    db.commit()
+    return result
 
 
 @router.put("/{skill_id}", response_model=SkillResponse)
@@ -143,7 +150,7 @@ def update_skill(
     skill_id: int,
     payload: SkillUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_admin),
+    current_admin: User = Depends(get_current_admin),
 ):
     """[Admin] Cập nhật kỹ năng."""
     skill = db.query(Skill).filter(Skill.id == skill_id, Skill.is_deleted == False).first()
@@ -163,14 +170,17 @@ def update_skill(
     if payload.description is not None:
         skill.description = payload.description
 
-    return _commit_skill(db, skill)
+    result = _commit_skill(db, skill)
+    log_audit(db, current_admin.id, "skill.update", target_type="skill", target_id=result.id)
+    db.commit()
+    return result
 
 
 @router.delete("/{skill_id}", status_code=204)
 def delete_skill(
     skill_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_admin),
+    current_admin: User = Depends(get_current_admin),
 ):
     """[Admin] Xóa mềm kỹ năng (Soft Delete — bảo toàn dữ liệu liên kết)."""
     skill = db.query(Skill).filter(Skill.id == skill_id, Skill.is_deleted == False).first()
@@ -178,4 +188,5 @@ def delete_skill(
         raise HTTPException(status_code=404, detail="Kỹ năng không tồn tại")
     skill.is_deleted = True
     skill.deleted_at = datetime.now(timezone.utc)
+    log_audit(db, current_admin.id, "skill.delete", target_type="skill", target_id=skill.id)
     db.commit()

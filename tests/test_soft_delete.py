@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 from app.api.skills import SkillCreate, create_skill
 from app.api.jobs import _get_or_restore_skill
+from app.models import profile  # noqa: F401 — đăng ký mapper Profile cho relationship User.profile
 
 
 class FakeQuery:
@@ -55,7 +56,7 @@ def test_create_skill_restores_soft_deleted_record():
     result = create_skill(
         SkillCreate(name="Python", category="programming_language", description="language"),
         db=db,
-        _=SimpleNamespace(role="admin"),
+        current_admin=SimpleNamespace(id=1, role="admin"),
     )
 
     assert result is deleted

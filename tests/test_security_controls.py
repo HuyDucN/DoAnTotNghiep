@@ -6,7 +6,7 @@ from fastapi import HTTPException, Request
 from app.api.admin import ActiveUpdate, update_user_active
 from app.api.users import ActiveUpdate as LegacyActiveUpdate, update_user_active as update_user_active_legacy
 from app.core.rate_limit import rate_limit
-from app.core.security import get_current_employer
+from app.core.security import get_current_recruiter
 from app.models.skill_gap import SkillGap
 
 
@@ -39,6 +39,46 @@ def test_rate_limit_is_scoped_to_route_and_client_ip():
     assert "Retry-After" in error.value.headers
     check_limit(make_request("/api/auth/register", "192.0.2.1"))
     check_limit(make_request("/api/auth/login", "192.0.2.2"))
+
+
+def make_proxied_request(route_path: str, proxy_ip: str, forwarded_for: str) -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": route_path,
+            "headers": [(b"x-forwarded-for", forwarded_for.encode("latin-1"))],
+            "query_string": b"",
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": (proxy_ip, 1234),
+            "root_path": "",
+            "http_version": "1.1",
+            "route": SimpleNamespace(path=route_path),
+        }
+    )
+
+
+def test_rate_limit_ignores_forwarded_header_from_untrusted_source(monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "TRUSTED_PROXIES", "[]")
+    check_limit = rate_limit(max_requests=1, window_seconds=60)
+    check_limit(make_proxied_request("/api/auth/login", "192.0.2.1", "198.51.100.9"))
+    # Header gia tu nguon khong tin cay: van tinh theo IP ket noi truc tiep.
+    with pytest.raises(HTTPException) as error:
+        check_limit(make_proxied_request("/api/auth/login", "192.0.2.1", "198.51.100.99"))
+    assert error.value.status_code == 429
+
+
+def test_rate_limit_trusts_forwarded_header_from_trusted_proxy(monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "TRUSTED_PROXIES", '["192.0.2.1"]')
+    check_limit = rate_limit(max_requests=1, window_seconds=60)
+    check_limit(make_proxied_request("/api/auth/login", "192.0.2.1", "198.51.100.9"))
+    # Cung proxy nhung client thuc khac nhau: khong bi chan nham.
+    check_limit(make_proxied_request("/api/auth/login", "192.0.2.1", "198.51.100.10"))
+    with pytest.raises(HTTPException):
+        check_limit(make_proxied_request("/api/auth/login", "192.0.2.1", "198.51.100.9"))
 
 
 class FakeQuery:
@@ -146,11 +186,11 @@ def test_skill_gap_has_database_uniqueness_constraint():
     assert ("user_id", "cv_id", "job_id") in unique_keys
 
 
-def test_employer_dependency_accepts_only_employer_role():
-    employer = SimpleNamespace(role="employer")
-    assert get_current_employer(employer) is employer
+def test_recruiter_dependency_accepts_only_recruiter_role():
+    recruiter = SimpleNamespace(role="recruiter")
+    assert get_current_recruiter(recruiter) is recruiter
 
     with pytest.raises(HTTPException) as error:
-        get_current_employer(SimpleNamespace(role="user"))
+        get_current_recruiter(SimpleNamespace(role="user"))
 
     assert error.value.status_code == 403

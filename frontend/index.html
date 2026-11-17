@@ -1,13 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="application-name" content="CV Skill Gap" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta name="theme-color" content="#172239" />
+    <meta name="description" content="CV Skill Gap — Hiểu năng lực, chủ động tương lai." />
+    <title>CV Skill Gap — Hiểu năng lực. Mở cơ hội.</title>
+    <style>
+      .boot-screen { min-height: 100dvh; display: grid; place-items: center; background: #f6f7fb; color: #212a3d; font-family: system-ui, sans-serif; }
+      .boot-card { display: flex; align-items: center; gap: 12px; padding: 14px 17px; border: 1px solid #e7e9f1; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(35, 31, 71, .08); font-size: 12px; }
+      .boot-mark { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: #7261e5; color: #fff; font-weight: 700; }
+      .boot-spinner { width: 15px; height: 15px; margin-left: 8px; border: 2px solid #e4e1f2; border-top-color: #6253d9; border-radius: 50%; animation: boot-spin .8s linear infinite; }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .boot-spinner { animation: none; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-screen" role="status" aria-label="Đang tải CV Skill Gap">
+        <div class="boot-card"><span class="boot-mark">✦</span><span>Đang tải CV Skill Gap...</span><span class="boot-spinner" aria-hidden="true"></span></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

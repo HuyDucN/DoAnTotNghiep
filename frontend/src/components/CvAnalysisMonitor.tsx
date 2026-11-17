@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { Loader2, Sparkles } from 'lucide-react';
 import { cvApi } from '../services/api';
 import { cvCompletionKey, cvStatusKey, myCvsKey, refreshCompletedCvs } from '../services/cvCache';
 import type { CV, CVStatus } from '../types';
@@ -23,5 +25,16 @@ export default function CvAnalysisMonitor() {
     const ids = completion.split('|').map((entry) => Number(entry.split(':')[0]));
     void refreshCompletedCvs(client, ids);
   }, [client, completion]);
-  return null;
+  if (pending.length === 0) return null;
+
+  return (
+    <div className="cv-analysis-live" role="status" aria-live="polite">
+      <span className="cv-analysis-live-icon"><Loader2 size={14} className="animate-spin" aria-hidden="true" /></span>
+      <span className="cv-analysis-live-copy">
+        <strong>AI đang phân tích CV</strong>
+        <small>{pending.length === 1 ? 'Kết quả sẽ xuất hiện sau ít phút.' : `${pending.length} CV đang được xử lý.`}</small>
+      </span>
+      <Link to="/cv" className="cv-analysis-live-link"><Sparkles size={13} aria-hidden="true" /> Xem CV</Link>
+    </div>
+  );
 }

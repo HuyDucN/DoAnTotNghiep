@@ -176,9 +176,6 @@ export default function CVPage() {
             <p>
               <strong>AI sẽ làm gì?</strong><br />
               Tự động trích xuất kỹ năng, kinh nghiệm và gợi ý khoảng cách năng lực.
-              {!import.meta.env.VITE_AI_ENABLED && (
-                <span className="ai-offline-note"> (AI đang tạm offline — dữ liệu sẽ trống)</span>
-              )}
             </p>
           </div>
         </section>

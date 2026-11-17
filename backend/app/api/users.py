@@ -153,6 +153,7 @@ def change_password(
         raise HTTPException(status_code=400, detail="Mật khẩu cũ không chính xác")
 
     user.password_hash = hash_password(payload.new_password)
+    user.token_version = (user.token_version or 0) + 1
     db.commit()
     return {"message": "Đổi mật khẩu thành công"}
 

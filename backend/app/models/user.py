@@ -11,8 +11,11 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
-    role = Column(Enum("user", "admin", "employer"), default="user", nullable=False)
+    role = Column(Enum("user", "admin", "recruiter"), default="user", nullable=False)
     is_active = Column(Boolean, default=True)
+    # Recruiter đăng ký mới cần admin duyệt; user/admin luôn coi như đã xác minh.
+    is_verified = Column(Boolean, default=True, nullable=False)
+    token_version = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

@@ -2,7 +2,6 @@ import os
 import uuid
 import shutil
 import hashlib
-from threading import Lock
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Path
 from fastapi.responses import FileResponse
@@ -27,18 +26,6 @@ from app.services.cv_deletion import delete_stored_cv
 from app.services.cv_upload import persist_cv_upload
 
 router = APIRouter(prefix="/cv", tags=["CV Management"])
-
-# BackgroundTasks chạy trong cùng tiến trình backend. Khóa theo hash ngăn hai
-# task cùng lúc gọi AI cho đúng một nội dung file; task thứ hai sẽ thấy cache
-# sau khi task thứ nhất hoàn tất. Khi chạy nhiều worker/server, Redis lock là
-# bước mở rộng phù hợp hơn.
-_analysis_locks: dict[str, Lock] = {}
-_analysis_locks_guard = Lock()
-
-
-def _get_analysis_lock(file_hash: str) -> Lock:
-    with _analysis_locks_guard:
-        return _analysis_locks.setdefault(file_hash, Lock())
 
 @router.post("/upload", response_model=CVResponse, status_code=201)
 async def upload_cv(
@@ -65,7 +52,8 @@ async def upload_cv(
         user_id=current_user.id,
         db=db,
     )
-    background_tasks.add_task(process_cv_analysis, result.id, file_path, run_id)
+    from app.services.analysis_queue import queue_cv_analysis
+    queue_cv_analysis(background_tasks, result.id, file_path, run_id)
     return result
 
 
@@ -266,7 +254,8 @@ def reanalyze_cv(
     result = CVResponse.model_validate(cv)
     file_path = cv.file_path
     db.commit()
-    background_tasks.add_task(process_cv_analysis, cv_id, file_path, run_id)
+    from app.services.analysis_queue import queue_cv_analysis
+    queue_cv_analysis(background_tasks, cv_id, file_path, run_id)
     return result
 
 
@@ -277,9 +266,9 @@ def process_cv_analysis(cv_id: int, file_path: str, run_id: str | None = None):
     phân tích thành công, sao chép kết quả AI thay vì gọi lại OpenAI API.
     """
     from app.core.database import SessionLocal
+    from app.services.analysis_queue import hash_lock
     # Use a new DB session in background task
     session = SessionLocal()
-    hash_lock = None
     claimed = False
     try:
         cv = session.query(CV).filter(CV.id == cv_id).first()
@@ -290,98 +279,95 @@ def process_cv_analysis(cv_id: int, file_path: str, run_id: str | None = None):
         file_hash = cv.file_hash
         # End the read transaction before waiting for another analysis or doing I/O.
         session.rollback()
-        if file_hash:
-            lock = _get_analysis_lock(file_hash)
-            lock.acquire()
-            hash_lock = lock
 
-        cv = _get_cv_for_analysis_update(session, cv_id)
-        if cv is None or cv.status != "uploaded" or cv.analysis_run_id != run_id:
-            return
-        expected_run_id = run_id
-        if run_id is None:
-            # Initialize legacy queued rows when no attempt ID was supplied.
-            run_id = uuid.uuid4().hex
-        file_hash = cv.file_hash
-        file_path = cv.file_path
-        changed = (
-            session.query(CV)
-            .filter(CV.id == cv_id, CV.status == "uploaded", CV.analysis_run_id == expected_run_id)
-            .update({
-                CV.status: "processing", CV.analysis_run_id: run_id,
-                CV.updated_at: datetime.now(timezone.utc).replace(tzinfo=None),
-            }, synchronize_session=False)
-        )
-        if changed != 1:
-            session.rollback()
-            return
-        session.commit()
-        claimed = True
-
-        # ── Cache check: tìm CV khác cùng hash đã analyzed ─────────────────────
-        if file_hash:
-            cached_cv = (
+        with hash_lock(file_hash):
+            cv = _get_cv_for_analysis_update(session, cv_id)
+            if cv is None or cv.status != "uploaded" or cv.analysis_run_id != run_id:
+                return
+            expected_run_id = run_id
+            if run_id is None:
+                # Initialize legacy queued rows when no attempt ID was supplied.
+                run_id = uuid.uuid4().hex
+            file_hash = cv.file_hash
+            file_path = cv.file_path
+            changed = (
                 session.query(CV)
-                .filter(
-                    CV.file_hash == file_hash,
-                    CV.status == "analyzed",
-                    CV.id != cv_id,
-                    CV.ai_analysis.isnot(None),
-                )
-                .first()
+                .filter(CV.id == cv_id, CV.status == "uploaded", CV.analysis_run_id == expected_run_id)
+                .update({
+                    CV.status: "processing", CV.analysis_run_id: run_id,
+                    CV.updated_at: datetime.now(timezone.utc).replace(tzinfo=None),
+                }, synchronize_session=False)
             )
-            if cached_cv:
-                raw_text = cached_cv.raw_text
-                analysis = {
-                    **cached_cv.ai_analysis,
-                    **extract_cv_contacts(raw_text or ""),
-                }
+            if changed != 1:
                 session.rollback()
-                cv = _get_cv_for_analysis_update(session, cv_id)
-                if not _analysis_run_is_current(cv, run_id):
+                return
+            session.commit()
+            claimed = True
+
+            # ── Cache check: tìm CV khác cùng hash đã analyzed ─────────────────────
+            if file_hash:
+                cached_cv = (
+                    session.query(CV)
+                    .filter(
+                        CV.file_hash == file_hash,
+                        CV.status == "analyzed",
+                        CV.id != cv_id,
+                        CV.ai_analysis.isnot(None),
+                    )
+                    .first()
+                )
+                if cached_cv:
+                    raw_text = cached_cv.raw_text
+                    analysis = {
+                        **cached_cv.ai_analysis,
+                        **extract_cv_contacts(raw_text or ""),
+                    }
+                    session.rollback()
+                    cv = _get_cv_for_analysis_update(session, cv_id)
+                    if not _analysis_run_is_current(cv, run_id):
+                        return
+                    cv.raw_text = raw_text
+                    cv.ai_analysis = analysis
+                    cv.status = "analyzed"
+                    _save_cv_skills(cv_id, analysis.get("skills", []), session)
+                    session.commit()
                     return
-                cv.raw_text = raw_text
+            session.rollback()
+
+            # ── Step 1: Extract text ──────────────────────────────────────────────
+            raw_text = extract_text_from_file(file_path)
+            # Some valid CVs (especially DOCX files made from tables) contain very
+            # little extractable text. Do not mark the upload failed just because
+            # it is shorter than an arbitrary threshold; the analyzer can still
+            # provide a development fallback or a useful API error.
+            if not raw_text or not raw_text.strip():
+                # Keep the record usable for the mock analyzer (and report a
+                # meaningful analysis result instead of silently failing).
+                raw_text = "CV không có lớp văn bản có thể trích xuất."
+
+            # Do not submit extracted text to AI if deletion already completed.
+            exists = session.query(CV.id).filter(
+                CV.id == cv_id, CV.analysis_run_id == run_id, CV.status == "processing",
+            ).first() is not None
+            session.rollback()
+            if not exists:
+                return
+
+            # ── Step 2: AI analysis ───────────────────────────────────────────────
+            analysis = analyze_cv_with_ai(raw_text, file_path)
+            cv = _get_cv_for_analysis_update(session, cv_id)
+            if not _analysis_run_is_current(cv, run_id):
+                return
+            cv.raw_text = raw_text
+            if analysis:
                 cv.ai_analysis = analysis
                 cv.status = "analyzed"
+                # Save extracted skills to cv_skills table
                 _save_cv_skills(cv_id, analysis.get("skills", []), session)
-                session.commit()
-                return
-        session.rollback()
+            else:
+                cv.status = "failed"
 
-        # ── Step 1: Extract text ──────────────────────────────────────────────
-        raw_text = extract_text_from_file(file_path)
-        # Some valid CVs (especially DOCX files made from tables) contain very
-        # little extractable text. Do not mark the upload failed just because
-        # it is shorter than an arbitrary threshold; the analyzer can still
-        # provide a development fallback or a useful API error.
-        if not raw_text or not raw_text.strip():
-            # Keep the record usable for the mock analyzer (and report a
-            # meaningful analysis result instead of silently failing).
-            raw_text = "CV không có lớp văn bản có thể trích xuất."
-
-        # Do not submit extracted text to AI if deletion already completed.
-        exists = session.query(CV.id).filter(
-            CV.id == cv_id, CV.analysis_run_id == run_id, CV.status == "processing",
-        ).first() is not None
-        session.rollback()
-        if not exists:
-            return
-
-        # ── Step 2: AI analysis ───────────────────────────────────────────────
-        analysis = analyze_cv_with_ai(raw_text, file_path)
-        cv = _get_cv_for_analysis_update(session, cv_id)
-        if not _analysis_run_is_current(cv, run_id):
-            return
-        cv.raw_text = raw_text
-        if analysis:
-            cv.ai_analysis = analysis
-            cv.status = "analyzed"
-            # Save extracted skills to cv_skills table
-            _save_cv_skills(cv_id, analysis.get("skills", []), session)
-        else:
-            cv.status = "failed"
-
-        session.commit()
+            session.commit()
     except Exception as e:
         session.rollback()
         if not claimed:
@@ -392,8 +378,6 @@ def process_cv_analysis(cv_id: int, file_path: str, run_id: str | None = None):
             cv.status = "failed"
             session.commit()
     finally:
-        if hash_lock is not None:
-            hash_lock.release()
         session.close()
 
 

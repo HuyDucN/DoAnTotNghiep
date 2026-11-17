@@ -3,7 +3,8 @@ import re
 
 
 SKILL_CATALOG = {
-    "python": "high", "java": "high", "javascript": "high", "typescript": "medium",
+    "python": "high", "java": "high", "c": "medium", "c++": "medium",
+    "c#": "medium", "javascript": "high", "typescript": "medium",
     "react": "high", "vue": "medium", "angular": "medium", "node.js": "medium",
     "fastapi": "medium", "django": "medium", "sql": "high", "mysql": "medium",
     "postgresql": "medium", "mongodb": "medium", "redis": "low", "docker": "medium",
@@ -24,7 +25,9 @@ SECTION_MARKERS = re.compile(
 
 
 def _contains_term(text: str, term: str) -> bool:
-    return re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text, re.IGNORECASE) is not None
+    # Ky hieu +/#/. la mot phan cua ten skill (C++/C#/Node.js) nen bien tu
+    # \w thong thuong se nhan dien nham "c" ben trong "C++".
+    return re.search(r"(?<![\w+#.])" + re.escape(term) + r"(?![\w+#.])", text, re.IGNORECASE) is not None
 
 
 def _extract_skills(text: str) -> tuple[list[dict], list[dict]]:

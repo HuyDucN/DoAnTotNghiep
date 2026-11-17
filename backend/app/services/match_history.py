@@ -36,4 +36,6 @@ def skill_gap_response(gap: SkillGap) -> SkillGapResponse:
         created_at=gap.created_at,
         matched_at=gap.matched_at,
         job_snapshot_available=historical_job is not None,
+        review_status=getattr(gap, "review_status", None) or "new",
+        reviewed_at=gap.reviewed_at,
     )

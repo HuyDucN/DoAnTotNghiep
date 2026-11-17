@@ -76,7 +76,7 @@ def change_after_authentication(api, change, target_id=3):
 @pytest.mark.parametrize("path", PATHS)
 @pytest.mark.parametrize("requested_active", [False, True])
 @pytest.mark.parametrize("change_kind,status_code", [
-    ("locked", 401), ("deleted", 401), ("user", 403), ("employer", 403),
+    ("locked", 401), ("deleted", 401), ("user", 403), ("recruiter", 403),
 ])
 def test_actor_losing_permission_after_authentication_cannot_change_target(
     management_api, path, requested_active, change_kind, status_code,

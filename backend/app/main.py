@@ -1,8 +1,9 @@
 import os
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI
 from app.core.http_errors import configure_http_errors
 from app.core.config import settings
-from app.core.database import engine, Base
+from app.core.database import engine, Base, SessionLocal
 from app.api import admin, auth, cv, jobs, users, skills
 
 # Keep development convenience without silently mutating production schemas.
@@ -43,6 +44,56 @@ app.add_middleware(LimitUploadSizeMiddleware, max_upload_size=11 * 1024 * 1024)
 
 # Mount static files for uploaded CVs
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+
+
+def recover_stale_cv_analysis(stale_minutes: int = 30) -> int:
+    """Dua CV ket o uploaded/processing qua lau ve uploaded de reanalyze thu lai.
+
+    Giu nguyen analysis_run_id hien tai; worker chi nhan viec khi ma con khop
+    nen khong ghi de lan phan tich moi hon.
+    """
+    from app.models.cv import CV
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=stale_minutes)
+    db = SessionLocal()
+    try:
+        stale = (
+            db.query(CV)
+            .filter(CV.status.in_(["uploaded", "processing"]))
+            .all()
+        )
+        count = 0
+        for cv in stale:
+            last = cv.updated_at or cv.created_at
+            if last is not None and last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            if last is not None and last >= cutoff:
+                continue
+            cv.status = "uploaded"
+            count += 1
+        db.commit()
+        return count
+    except Exception:
+        db.rollback()
+        return 0
+    finally:
+        db.close()
+
+
+@app.on_event("startup")
+def _recover_stale_analysis_on_startup():
+    if settings.ENVIRONMENT.lower() in {"development", "dev", "test"}:
+        return
+    try:
+        recovered = recover_stale_cv_analysis()
+        if recovered:
+            print(f"[Startup] Dua {recovered} CV ket ve uploaded de thu lai.")
+    except Exception as exc:
+        print(f"[Startup] Bo qua phuc hoi CV ket: {exc}")
+    try:
+        from app.services.analysis_queue import start_analysis_worker
+        start_analysis_worker()
+    except Exception as exc:
+        print(f"[Startup] Khong khoi dong duoc analysis worker: {exc}")
 
 
 # Routers

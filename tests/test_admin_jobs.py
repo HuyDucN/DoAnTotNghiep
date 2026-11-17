@@ -138,11 +138,18 @@ def test_created_and_updated_job_appears_in_filtered_list_with_fresh_counts(admi
     assert list_admin(client)["total"] == 132
 
 
-@pytest.mark.parametrize("role", ["user", "employer"])
-def test_non_admin_cannot_read_admin_job_list(admin_jobs_api, role):
+def test_non_admin_cannot_read_admin_job_list(admin_jobs_api):
     client, app = admin_jobs_api
-    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=2, role=role)
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=2, role="user")
     assert client.get("/api/jobs/admin/list").status_code == 403
+
+
+def test_recruiter_reads_only_own_jobs_from_admin_list(admin_jobs_api):
+    client, app = admin_jobs_api
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=2, role="recruiter")
+    response = client.get("/api/jobs/admin/list")
+    assert response.status_code == 200, response.text
+    assert response.json()["items"] == []
 
 
 def test_admin_job_list_requires_login(admin_jobs_api):

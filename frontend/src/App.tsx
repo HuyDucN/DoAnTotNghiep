@@ -1,6 +1,7 @@
-import { Component, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Component, lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 
 import AppLayout from './components/layout/AppLayout';
 import { useAuthStore } from './store/authStore';
@@ -18,19 +19,59 @@ const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 
-function RoleRoute({ role, children }: { role: 'user' | 'admin'; children: ReactNode }) {
+function homeFor(role: string | undefined): string {
+  if (role === 'admin') return '/admin';
+  if (role === 'recruiter') return '/admin/jobs';
+  return '/dashboard';
+}
+
+function RoleRoute({ roles, children }: { roles: Array<'user' | 'admin' | 'recruiter'>; children: ReactNode }) {
   const user = useAuthStore((state) => state.user);
   if (!user) return null;
-  return user.role === role ? children : <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace />;
+  return roles.includes(user.role) ? children : <Navigate to={homeFor(user.role)} replace />;
 }
 
 function HomeRedirect() {
   const user = useAuthStore((state) => state.user);
-  return <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />;
+  return <Navigate to={homeFor(user?.role)} replace />;
+}
+
+const routeTitles: Record<string, string> = {
+  '/login': 'Đăng nhập',
+  '/register': 'Tạo tài khoản',
+  '/forgot-password': 'Quên mật khẩu',
+  '/reset-password': 'Đặt lại mật khẩu',
+  '/dashboard': 'Tổng quan',
+  '/cv': 'CV của tôi',
+  '/profile': 'Hồ sơ năng lực',
+  '/jobs': 'Việc làm phù hợp',
+  '/reports': 'Báo cáo kỹ năng',
+  '/settings': 'Cài đặt tài khoản',
+  '/admin': 'Trung tâm quản trị',
+  '/admin/jobs': 'Quản lý Jobs',
+  '/admin/skills': 'Quản lý Skills',
+  '/admin/cvs': 'Quản lý CV',
+  '/admin/users': 'Người dùng',
+  '/admin/audit': 'Nhật ký kiểm toán',
+};
+
+function DocumentTitle() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    const title = routeTitles[pathname] ?? 'CV Skill Gap';
+    document.title = `${title} · CV Skill Gap`;
+  }, [pathname]);
+
+  return null;
 }
 
 function PageFallback() {
-  return <div className="flex justify-center p-8 text-muted" role="status">Đang tải trang...</div>;
+  return (
+    <main className="route-state" role="status">
+      <div className="route-state-card"><Loader2 size={22} className="animate-spin" /><span>Đang chuẩn bị trang của bạn...</span></div>
+    </main>
+  );
 }
 
 class RouteLoadErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -43,14 +84,15 @@ class RouteLoadErrorBoundary extends Component<{ children: ReactNode }, { hasErr
   render() {
     if (!this.state.hasError) return this.props.children;
     return (
-      <main className="flex justify-center p-8" role="alert">
-        <div className="card" style={{ maxWidth: '32rem', textAlign: 'center', padding: '2rem' }}>
+      <main className="route-state" role="alert">
+        <div className="route-error-card">
+          <span className="route-error-icon"><AlertTriangle size={20} aria-hidden="true" /></span>
           <h2>Không thể tải trang</h2>
-          <p className="text-muted mt-2">
+          <p>
             Kết nối có thể đã gián đoạn hoặc phiên bản giao diện vừa được cập nhật.
           </p>
-          <button type="button" className="btn btn-primary mt-4" onClick={() => window.location.reload()}>
-            Tải lại ứng dụng
+          <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
+            <RefreshCw size={14} aria-hidden="true" /> Tải lại ứng dụng
           </button>
         </div>
       </main>
@@ -63,19 +105,21 @@ function App() {
   const sessionVersion = useAuthStore((state) => state.sessionVersion);
   return (
     <BrowserRouter>
+      <DocumentTitle />
       <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
           style: {
             background: '#ffffff',
-            color: '#18243a',
-            border: '1px solid #e2e7ef',
+            color: '#212a3d',
+            border: '1px solid #e5e2f2',
             borderRadius: '10px',
-            fontSize: '0.9rem',
+            fontSize: '0.78rem',
+            boxShadow: '0 8px 24px rgba(42, 39, 75, 0.10)',
           },
-          success: { iconTheme: { primary: '#15803d', secondary: '#ffffff' } },
-          error:   { iconTheme: { primary: '#dc2626', secondary: '#ffffff' } },
+          success: { iconTheme: { primary: '#287b62', secondary: '#ffffff' } },
+          error:   { iconTheme: { primary: '#c55566', secondary: '#ffffff' } },
         }}
       />
       <RouteLoadErrorBoundary>
@@ -90,13 +134,14 @@ function App() {
         {/* Protected routes — wrapped in AppLayout */}
         <Route path="/" element={<AppLayout key={`${userId ?? 'anonymous'}:${sessionVersion}`} />}>
           <Route index element={<HomeRedirect />} />
-          <Route path="dashboard" element={<RoleRoute role="user"><DashboardPage /></RoleRoute>} />
-          <Route path="cv"        element={<RoleRoute role="user"><CVPage /></RoleRoute>} />
-          <Route path="profile"   element={<RoleRoute role="user"><SkillProfilePage /></RoleRoute>} />
-          <Route path="jobs"      element={<RoleRoute role="user"><JobsPage /></RoleRoute>} />
-          <Route path="reports"   element={<RoleRoute role="user"><ReportsPage /></RoleRoute>} />
+          <Route path="dashboard" element={<RoleRoute roles={['user']}><DashboardPage /></RoleRoute>} />
+          <Route path="cv"        element={<RoleRoute roles={['user']}><CVPage /></RoleRoute>} />
+          <Route path="profile"   element={<RoleRoute roles={['user']}><SkillProfilePage /></RoleRoute>} />
+          <Route path="jobs"      element={<RoleRoute roles={['user']}><JobsPage /></RoleRoute>} />
+          <Route path="reports"   element={<RoleRoute roles={['user']}><ReportsPage /></RoleRoute>} />
           <Route path="settings"  element={<SettingsPage />} />
-          <Route path="admin"     element={<RoleRoute role="admin"><AdminPage /></RoleRoute>} />
+          <Route path="admin"     element={<RoleRoute roles={['admin', 'recruiter']}><AdminPage /></RoleRoute>} />
+          <Route path="admin/:section" element={<RoleRoute roles={['admin', 'recruiter']}><AdminPage /></RoleRoute>} />
         </Route>
 
         {/* Catch-all */}

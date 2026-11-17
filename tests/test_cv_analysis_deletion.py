@@ -12,6 +12,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Query, sessionmaker
 
 from app.api import cv as cv_api
+from app.services import analysis_queue as queue_api
 from app.api.admin import router as admin_router
 from app.core import database
 from app.core.config import settings
@@ -123,7 +124,7 @@ def assert_no_result_was_recreated(api):
         assert session.query(CVSkill).count() == 0
         assert [s.name for s in session.query(Skill).all()] == ["Python"]
     assert all(not session.in_transaction() for session in api.background_sessions)
-    lock = cv_api._get_analysis_lock("analysis-delete-race")
+    lock = queue_api._get_analysis_lock("analysis-delete-race")
     assert lock.acquire(blocking=False), "The canceled analysis left its hash lock held"
     lock.release()
 
@@ -141,7 +142,7 @@ def test_task_started_after_deletion_skips_parser_and_ai(analysis_api, scope):
 @pytest.mark.parametrize("scope", ["owner", "admin"])
 def test_deletion_while_task_waits_for_same_hash_analysis(analysis_api, monkeypatch, scope):
     api = analysis_api
-    held_lock = cv_api._get_analysis_lock("analysis-delete-race")
+    held_lock = queue_api._get_analysis_lock("analysis-delete-race")
     held_lock.acquire()
     waiting = Event()
 
@@ -151,7 +152,7 @@ def test_deletion_while_task_waits_for_same_hash_analysis(analysis_api, monkeypa
         return held_lock
 
     with monkeypatch.context() as scoped:
-        scoped.setattr(cv_api, "_get_analysis_lock", report_waiting)
+        scoped.setattr(queue_api, "_get_analysis_lock", report_waiting)
         with ThreadPoolExecutor(max_workers=1) as pool:
             task = pool.submit(cv_api.process_cv_analysis, 27, str(api.original))
             try:

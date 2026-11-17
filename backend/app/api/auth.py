@@ -29,6 +29,9 @@ def register(
         email=payload.email,
         password_hash=hash_password(payload.password),
         full_name=payload.full_name,
+        role=payload.role or "user",
+        # Recruiter đăng ký mới phải chờ admin duyệt mới được đăng job.
+        is_verified=(payload.role or "user") != "recruiter",
     )
     db.add(user)
     db.flush()
@@ -39,7 +42,7 @@ def register(
     db.commit()
     db.refresh(user)
 
-    token = create_user_access_token(user.id, user.password_hash)
+    token = create_user_access_token(user.id, user.password_hash, user.token_version or 0)
     return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
 
 
@@ -56,7 +59,7 @@ def login(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Tài khoản đã bị khóa")
 
-    token = create_user_access_token(user.id, user.password_hash)
+    token = create_user_access_token(user.id, user.password_hash, user.token_version or 0)
     return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
 @router.post("/logout")
 def logout():
@@ -109,6 +112,7 @@ def reset_password(
         raise invalid_token
 
     user.password_hash = hash_password(payload.new_password)
+    user.token_version = (user.token_version or 0) + 1
     db.commit()
 
     return {"message": "Đặt lại mật khẩu thành công", "user_id": user.id}

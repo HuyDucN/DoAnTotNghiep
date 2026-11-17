@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.services.audit import log_audit
 
 
 def set_user_active(
@@ -57,6 +58,12 @@ def set_user_active(
             raise HTTPException(status_code=400, detail="Không thể khóa admin hoạt động cuối cùng")
 
     user.is_active = is_active
+    # Thu hoi toan bo JWT da cap: token cu khong dung lai duoc sau khi mo khoa.
+    user.token_version = (user.token_version or 0) + 1
+    log_audit(
+        db, actor_id, "user.unlock" if is_active else "user.lock",
+        target_type="user", target_id=user.id,
+    )
     db.commit()
     db.refresh(user)
     return user

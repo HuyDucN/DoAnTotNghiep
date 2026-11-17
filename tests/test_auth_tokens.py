@@ -364,7 +364,7 @@ def test_registration_issues_bound_access_token(auth_api):
 
 @pytest.mark.parametrize("operation", ["reset", "change"])
 @pytest.mark.parametrize("password", [NEW_PASSWORD, OLD_PASSWORD])
-@pytest.mark.parametrize("role", ["user", "admin", "employer"])
+@pytest.mark.parametrize("role", ["user", "admin", "recruiter"])
 def test_password_update_revokes_existing_access_tokens(auth_api, operation, password, role):
     with auth_api.sessions() as session:
         session.get(User, USER_ID).role = role
@@ -458,7 +458,7 @@ def test_changing_purpose_cannot_reuse_password_binding(auth_api, purpose):
     assert stored_hash(auth_api) == auth_api.original_hash
 
 
-@pytest.mark.parametrize("role", ["user", "admin", "employer"])
+@pytest.mark.parametrize("role", ["user", "admin", "recruiter"])
 def test_account_endpoints_require_authenticated_active_user(auth_api, role):
     with auth_api.sessions() as session:
         session.get(User, USER_ID).role = role
@@ -488,7 +488,7 @@ def test_account_endpoints_require_authenticated_active_user(auth_api, role):
 
 
 @pytest.mark.parametrize("path", ["/api/admin/users/4/active", "/api/users/admin/4/active"])
-@pytest.mark.parametrize("role", ["user", "admin", "employer"])
+@pytest.mark.parametrize("role", ["user", "admin", "recruiter"])
 def test_admin_lock_ends_access_for_existing_tokens_on_all_user_routes(auth_api, path, role):
     with auth_api.sessions() as session:
         session.get(User, USER_ID).role = role
@@ -543,6 +543,8 @@ def test_admin_lock_ends_access_for_existing_tokens_on_all_user_routes(auth_api,
     assert auth_api.client.get("/api/admin/users", headers=operator_headers).status_code == 200
     unlocked = auth_api.client.patch(path, json={"is_active": True}, headers=operator_headers)
     assert unlocked.status_code == 200
+    # Token cap truoc khi khoa van het hieu luc sau khi mo khoa (token_version da tang).
+    assert auth_api.client.get("/api/users/me", headers=headers).status_code == 401
     new_token = request_access_token(auth_api)
     response = auth_api.client.get("/api/users/me", headers={"Authorization": f"Bearer {new_token}"})
     assert response.status_code == 200

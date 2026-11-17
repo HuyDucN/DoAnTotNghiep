@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, JSON, Text, String, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, JSON, Text, String, UniqueConstraint, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.mysql import DATETIME as MySQLDateTime
 from sqlalchemy.sql import func
@@ -25,6 +25,13 @@ class SkillGap(Base):
     cv_input_hash = Column(String(64), nullable=True)
     # Store UTC explicitly; MySQL DATETIME does not preserve timezone metadata.
     matched_at = Column(DateTime(timezone=True).with_variant(MySQLDateTime(fsp=6), "mysql"), nullable=True)
+    # Pipeline sơ tuyển do phía tuyển dụng cập nhật; ứng viên không tự sửa.
+    review_status = Column(
+        Enum("new", "viewed", "shortlisted", "rejected", "hired"),
+        nullable=False, default="new",
+    )
+    recruiter_note = Column(Text, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

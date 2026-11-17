@@ -28,7 +28,7 @@ def admin_users_api():
         User(
             id=index, email=f"person{index}@example.test", password_hash="secret-hash",
             full_name="Needle Member" if index in {1, 5, 9} else f"Member {index}",
-            role="admin" if index in {1, 2} else "employer" if index == 3 else "user",
+            role="admin" if index in {1, 2} else "recruiter" if index == 3 else "user",
             is_active=index % 3 != 0, created_at=created_at,
         )
         for index in range(1, 46)
@@ -139,7 +139,7 @@ def test_admin_still_cannot_lock_own_account(admin_users_api):
     assert list_users(client, search="person1@example.test")["items"][0]["is_active"] is True
 
 
-@pytest.mark.parametrize("role", ["user", "employer"])
+@pytest.mark.parametrize("role", ["user", "recruiter"])
 def test_user_management_requires_admin_role(admin_users_api, role):
     client, app = admin_users_api
     app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=4, role=role)

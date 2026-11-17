@@ -44,7 +44,7 @@ attachSessionInterceptors(
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 export const authApi = {
-  register: (data: { email: string; password: string; full_name: string }) =>
+  register: (data: { email: string; password: string; full_name: string; role?: 'user' | 'recruiter' }) =>
     api.post('/auth/register', data).then((r) => r.data),
 
   login: (data: { email: string; password: string }) =>
@@ -149,6 +149,31 @@ export const jobsApi = {
   create: (data: object) => api.post('/jobs/admin', data).then((r) => r.data),
   update: (id: number, data: object) => api.put(`/jobs/admin/${id}`, data).then((r) => r.data),
   delete: (id: number) => api.delete(`/jobs/admin/${id}`),
+  applicants: (jobId: number, params?: { review_status?: string; page?: number; size?: number }) =>
+    api.get(`/jobs/admin/${jobId}/applicants`, { params }).then((r) => r.data),
+  reviewApplicant: (gapId: number, data: { review_status?: string; recruiter_note?: string | null }) =>
+    api.patch(`/jobs/admin/applicants/${gapId}`, data).then((r) => r.data),
+  jobStats: (jobId: number) =>
+    api.get(`/jobs/admin/${jobId}/stats`).then((r) => r.data),
+  myOverview: () =>
+    api.get('/jobs/admin-overview/mine').then((r) => r.data),
+  newApplicantNotices: (days?: number) =>
+    api.get('/jobs/admin/notifications/new-applicants', { params: days ? { days } : undefined }).then((r) => r.data),
+  duplicate: (id: number) => api.post(`/jobs/admin/${id}/duplicate`).then((r) => r.data),
+  exportApplicants: async (jobId: number, review_status?: string) => {
+    const response = await api.get(`/jobs/admin/${jobId}/applicants/export`, {
+      params: review_status ? { review_status } : undefined,
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `job-${jobId}-applicants.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
 };
 
 // ── Skills ────────────────────────────────────────────────────────────────────
@@ -168,7 +193,13 @@ export const adminApi = {
     api.get('/admin/users', { params }).then((r) => r.data),
   updateUserActive: (id: number, is_active: boolean) =>
     api.patch(`/admin/users/${id}/active`, { is_active }).then((r) => r.data),
+  verifyRecruiter: (id: number, is_verified: boolean) =>
+    api.patch(`/admin/users/${id}/verify`, { is_verified }).then((r) => r.data),
+  auditLogs: (params?: { action?: string; page?: number; size?: number }) =>
+    api.get('/admin/audit-logs', { params }).then((r) => r.data),
   cvs: (params?: { page?: number; size?: number }) =>
     api.get('/admin/cvs', { params }).then((r) => r.data),
   deleteCv: (id: number) => api.delete(`/admin/cvs/${id}`),
+  stats: (days?: number) =>
+    api.get('/admin/stats', { params: days ? { days } : undefined }).then((r) => r.data),
 };

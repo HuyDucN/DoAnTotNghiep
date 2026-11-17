@@ -1,0 +1,17 @@
+{
+  "name": "CV Skill Gap",
+  "short_name": "CV Skill Gap",
+  "description": "Hiểu năng lực. Mở cơ hội.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#172239",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

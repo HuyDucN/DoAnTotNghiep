@@ -1,4 +1,7 @@
--- SQL schema reference: snapshot 2026-10-10 plus migrations 005-007 (2026-10-16).
+-- SQL schema reference: snapshot 2026-10-10 plus migrations 005-008 (2026-10-19)
+-- plus Alembic 000000000001 (baseline), 000000000002 (recruiter),
+-- 000000000003 (jobs.owner_id), 000000000004 (skill_gaps pipeline),
+-- 000000000005 (users.is_verified + audit_logs).
 
 -- Structure only: no account data, CV content or credentials.
 
@@ -26,8 +29,10 @@ CREATE TABLE `jobs` (
   `updated_at` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
   `deleted_at` datetime DEFAULT NULL,
+  `owner_id` int DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `ix_jobs_id` (`id`),
+  KEY `ix_jobs_owner_id` (`owner_id`),
   KEY `idx_jobs_is_deleted` (`is_deleted`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -55,14 +60,33 @@ CREATE TABLE `users` (
   `email` varchar(255) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `full_name` varchar(255) NOT NULL,
-  `role` enum('user','admin','employer') NOT NULL DEFAULT 'user',
+  `role` enum('user','admin','recruiter') NOT NULL DEFAULT 'user',
   `is_active` tinyint(1) DEFAULT NULL,
+  `token_version` int NOT NULL DEFAULT '0',
+  `is_verified` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` datetime DEFAULT (now()),
   `updated_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `ix_users_email` (`email`),
   KEY `ix_users_id` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table: audit_logs
+
+CREATE TABLE `audit_logs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `actor_id` int DEFAULT NULL,
+  `action` varchar(64) NOT NULL,
+  `target_type` varchar(32) DEFAULT NULL,
+  `target_id` int DEFAULT NULL,
+  `detail` json DEFAULT NULL,
+  `created_at` datetime DEFAULT (now()),
+  PRIMARY KEY (`id`),
+  KEY `ix_audit_logs_id` (`id`),
+  KEY `ix_audit_logs_actor_id` (`actor_id`),
+  KEY `ix_audit_logs_action` (`action`),
+  CONSTRAINT `audit_logs_ibfk_1` FOREIGN KEY (`actor_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Table: cvs
 
@@ -154,6 +178,9 @@ CREATE TABLE `skill_gaps` (
   `job_snapshot` json DEFAULT NULL,
   `cv_input_hash` varchar(64) DEFAULT NULL,
   `matched_at` datetime(6) DEFAULT NULL,
+  `review_status` enum('new','viewed','shortlisted','rejected','hired') NOT NULL DEFAULT 'new',
+  `recruiter_note` text,
+  `reviewed_at` datetime DEFAULT NULL,
   `created_at` datetime DEFAULT (now()),
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),

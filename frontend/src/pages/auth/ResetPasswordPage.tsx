@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import './AuthPage.css';
+import AuthLayout from './AuthLayout';
 
 const resetPasswordSchema = z.object({
   token: z.string().trim().min(1, 'Vui lòng nhập mã khôi phục'),
@@ -55,13 +55,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-bg">
-        <div className="auth-orb auth-orb-1" />
-        <div className="auth-orb auth-orb-2" />
-        <div className="auth-orb auth-orb-3" />
-      </div>
-      <div className="auth-card animate-fade-in">
+    <AuthLayout>
         <div className="auth-logo">
           <div className="auth-logo-mark">
             <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -85,9 +79,11 @@ export default function ResetPasswordPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="auth-form" noValidate>
           <div className="form-group">
-            <label className="form-label">Mã khôi phục (Token)</label>
+            <label className="form-label" htmlFor="reset-token">Mã khôi phục</label>
             <input
               type="text"
+              id="reset-token"
+              autoComplete="off"
               className={`form-input ${errors.token ? 'input-error' : ''}`}
               placeholder="Nhập hoặc dán token..."
               aria-invalid={Boolean(errors.token)}
@@ -96,9 +92,11 @@ export default function ResetPasswordPage() {
             {errors.token && <p className="form-error">{errors.token.message}</p>}
           </div>
           <div className="form-group">
-            <label className="form-label">Mật khẩu mới</label>
+            <label className="form-label" htmlFor="reset-password">Mật khẩu mới</label>
             <input
               type="password"
+              id="reset-password"
+              autoComplete="new-password"
               className={`form-input ${errors.new_password ? 'input-error' : ''}`}
               placeholder="Ít nhất 8 ký tự"
               aria-invalid={Boolean(errors.new_password)}
@@ -107,9 +105,11 @@ export default function ResetPasswordPage() {
             {errors.new_password && <p className="form-error">{errors.new_password.message}</p>}
           </div>
           <div className="form-group">
-            <label className="form-label">Xác nhận mật khẩu</label>
+            <label className="form-label" htmlFor="reset-confirm">Xác nhận mật khẩu</label>
             <input
               type="password"
+              id="reset-confirm"
+              autoComplete="new-password"
               className={`form-input ${errors.confirm_password ? 'input-error' : ''}`}
               placeholder="Nhập lại mật khẩu mới"
               aria-invalid={Boolean(errors.confirm_password)}
@@ -122,7 +122,6 @@ export default function ResetPasswordPage() {
           </button>
         </form>
         <p className="auth-switch"><Link to="/login" className="auth-link">Quay lại đăng nhập</Link></p>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

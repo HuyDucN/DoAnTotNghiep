@@ -5,7 +5,7 @@ import { cvApi, jobsApi } from '../../services/api';
 import type { CV, SkillGapResult } from '../../types';
 import CvMatchStatusBadge from '../../components/CvMatchStatusBadge';
 import QueryLoadNotice from '../../components/QueryLoadNotice';
-import { FileText, Briefcase, TrendingUp, Star, ArrowRight, Loader2, Clock } from 'lucide-react';
+import { FileText, Briefcase, TrendingUp, Star, ArrowRight, Loader2, Clock, Upload, Check, ArrowUpRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 
@@ -75,12 +75,20 @@ export default function DashboardPage() {
 
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 12 ? 'Chào buổi sáng' : greetingHour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
+  const journey = [
+    { title: 'Thêm CV của bạn', description: 'Bắt đầu với hồ sơ hiện tại', to: '/cv', done: hasCvs ? stats.totalCvs > 0 : null },
+    { title: 'Khám phá năng lực', description: 'Xem kỹ năng AI đã phân tích', to: '/profile', done: hasCvs ? stats.analyzedCvs > 0 : null },
+    { title: 'Tìm cơ hội phù hợp', description: 'So khớp CV với công việc', to: '/jobs', done: hasGaps ? stats.totalMatches > 0 : null },
+  ];
+  const doneSteps = journey.filter((s) => s.done === true).length;
+  const readiness = Math.round((doneSteps / journey.length) * 100);
 
   return (
     <div className="dashboard-page animate-fade-in">
-      <div className="welcome-banner card">
+      <section className="welcome-banner">
         <div className="welcome-text">
-          <h2>{greeting}, <span className="text-brand">{user?.full_name}</span> 👋</h2>
+          <span className="hero-label">Hồ sơ ứng viên</span>
+          <h2>{greeting}, {user?.full_name || 'bạn'}.</h2>
           <p className="text-secondary">
             {!hasCvs
               ? cvsQuery.isPending ? 'Đang tải thông tin CV của bạn...' : 'Chưa tải được thông tin CV của bạn. Vui lòng thử lại bên dưới.'
@@ -90,18 +98,26 @@ export default function DashboardPage() {
                   ? 'Theo dõi trạng thái phân tích CV của bạn bên dưới.'
                   : cvsQuery.isSuccess ? 'Tải lên CV đầu tiên của bạn để bắt đầu phân tích kỹ năng bằng AI.' : 'Chưa xác nhận được danh sách CV mới nhất.'}
           </p>
-          {stats.processingCvs > 0 && (
-            <p className="text-warning" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              ⏳ {stats.processingCvs} CV đang được AI phân tích, vui lòng đợi vài phút...
-            </p>
-          )}
+          <div className="hero-actions">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/cv')}><Upload size={16} aria-hidden="true" />Tải CV lên <ArrowRight size={15} aria-hidden="true" /></button>
+            <button type="button" className="hero-secondary" onClick={() => navigate('/jobs')}>Khám phá việc làm <ArrowUpRight size={15} aria-hidden="true" /></button>
+          </div>
+          {stats.processingCvs > 0 && <p className="hero-processing"><Loader2 size={13} className="animate-spin" />{stats.processingCvs} CV đang được phân tích…</p>}
         </div>
-        {cvsQuery.isSuccess && stats.totalCvs === 0 && (
-          <button className="btn btn-primary" onClick={() => navigate('/cv')}>
-            Bắt đầu ngay <ArrowRight size={16} />
+        <div className="hero-readiness" aria-label="Muc do san sang">
+          <div className="hero-readiness-top">
+            <span>Mức độ sẵn sàng</span>
+            <strong>{readiness}%</strong>
+          </div>
+          <div className="progress-bar" role="progressbar" aria-valuenow={readiness} aria-valuemin={0} aria-valuemax={100}>
+            <div className="progress-bar-fill" style={{ width: `${readiness}%` }} />
+          </div>
+          <p>{doneSteps}/3 bước hoàn thành · {stats.totalMatches} lượt so khớp</p>
+          <button type="button" className="hero-readiness-link" onClick={() => navigate(journey.find((s) => !s.done)?.to ?? '/jobs')}>
+            Bước tiếp theo <ArrowUpRight size={14} aria-hidden="true" />
           </button>
-        )}
-      </div>
+        </div>
+      </section>
 
       <QueryLoadNotice query={cvsQuery} label="danh sách CV" />
       <QueryLoadNotice query={gapsQuery} label="kết quả so khớp" />
@@ -120,7 +136,7 @@ export default function DashboardPage() {
             <>
               <div className="metric-value">{stats.analyzedCvs}</div>
               <div className="metric-trend text-muted">
-                <span>Tổng {stats.totalCvs} CV đã upload</span>
+                <span>Trong tổng số {stats.totalCvs} CV đã tải lên</span>
               </div>
             </>
           )}
@@ -202,9 +218,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="dashboard-grid">
-        <div className="card">
+        <div className="card dashboard-history">
           <div className="panel-header">
-            <h3>Kết quả so khớp gần đây</h3>
+            <div><span className="panel-kicker">HOẠT ĐỘNG CỦA BẠN</span><h3>So khớp gần đây</h3></div>
             <button className="btn btn-ghost btn-sm" onClick={() => navigate('/reports')}>
               Xem tất cả <ArrowRight size={14} />
             </button>
@@ -215,17 +231,17 @@ export default function DashboardPage() {
           ) : (!hasGaps || (gapsQuery.isError && stats.recentGaps.length === 0)) ? (
             <p className="text-muted text-sm" role="status">Chưa tải được kết quả so khớp. Vui lòng thử tải lại ở thông báo phía trên.</p>
           ) : stats.recentGaps.length === 0 ? (
-            <div className="empty-state" style={{ padding: '32px 0' }}>
-              <Briefcase size={36} className="text-muted mb-3" />
-              <p className="text-muted text-sm">Chưa có lịch sử so khớp. Hãy vào trang <strong>Vị trí &amp; So khớp</strong> để bắt đầu.</p>
-              <button className="btn btn-outline btn-sm mt-4" onClick={() => navigate('/jobs')}>
-                Đến trang So khớp
-              </button>
+            <div className="dashboard-empty">
+              <span className="dashboard-empty-icon"><Briefcase size={28} strokeWidth={1.5} aria-hidden="true" /></span>
+              <h4>Cơ hội tiếp theo đang chờ bạn</h4>
+              <p>So khớp CV với một công việc để biết điểm mạnh<br className="desktop-break" /> và những kỹ năng bạn có thể phát triển.</p>
+              <button type="button" className="btn btn-secondary" onClick={() => navigate('/jobs')}>Tìm công việc phù hợp <ArrowRight size={14} aria-hidden="true" /></button>
             </div>
           ) : (
             <div className="gap-history-list">
               {stats.recentGaps.map((gap) => (
                 <div key={gap.id} className="gap-history-item">
+                  <span className="gap-company-mark" aria-hidden="true">{gap.job.title.charAt(0).toUpperCase()}</span>
                   <div className="gap-job-info">
                     <h4>{gap.job.title}</h4>
                     <p className="text-muted text-xs truncate" title={`CV #${gap.cv_id} · ${gap.cv_filename}`}>
@@ -254,15 +270,29 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="card">
+        <aside className="dashboard-side">
+        <div className="card journey-card">
+          <span className="panel-kicker">TỪ HÔM NAY, TỪNG BƯỚC MỘT</span>
+          <h3>Hành trình của bạn</h3>
+          <div className="journey-steps">
+            {journey.map((step, index) => (
+              <button type="button" className={'journey-step' + (step.done ? ' is-complete' : '')} key={step.to} onClick={() => navigate(step.to)}>
+                <span className="journey-number">{step.done ? <Check size={13} aria-hidden="true" /> : String(index + 1).padStart(2, '0')}</span>
+                <span><strong>{step.title}</strong><small>{step.done === null ? 'Chưa tải được trạng thái' : step.done ? 'Đã hoàn thành' : step.description}</small></span>
+                <ArrowUpRight size={14} className="journey-arrow" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="card quick-actions-card">
           <div className="panel-header">
-            <h3>Thao tác nhanh</h3>
+            <h3>Lối tắt cho bạn</h3>
           </div>
           <div className="quick-actions">
             <button className="quick-action-btn" onClick={() => navigate('/cv')}>
               <div className="qa-icon bg-info-light text-info"><FileText size={20} /></div>
               <div>
-                <strong>Upload CV</strong>
+                <strong>Quản lý CV</strong>
                 <p className="text-muted text-xs">Tải lên và phân tích CV bằng AI</p>
               </div>
               <ArrowRight size={16} className="text-muted ml-auto" />
@@ -293,7 +323,9 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+        </aside>
       </div>
+      <footer className="dashboard-footer"><span>CV Skill Gap · Hiểu năng lực, chủ động tương lai.</span></footer>
     </div>
   );
 }

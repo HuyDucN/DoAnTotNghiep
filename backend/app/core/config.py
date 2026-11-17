@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     TESSERACT_CMD: str = ""
     OCR_LANGUAGES: str = "vie+eng"
     CORS_ORIGINS: str = '["http://localhost:5173","http://localhost:3000"]'
+    TRUSTED_PROXIES: str = '[]'
+    REDIS_URL: str = ""
 
     @model_validator(mode="after")
     def validate_production_config(self):
@@ -43,6 +45,8 @@ class Settings(BaseSettings):
                 raise ValueError("DB_PASSWORD is required in production")
             if self.DEBUG:
                 raise ValueError("DEBUG must be false in production")
+            if self.ALLOW_DEV_RESET_TOKEN:
+                raise ValueError("ALLOW_DEV_RESET_TOKEN must be false in production")
         return self
 
     @property
@@ -56,9 +60,18 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         return json.loads(self.CORS_ORIGINS)
 
+    @property
+    def trusted_proxies_list(self) -> List[str]:
+        try:
+            value = json.loads(self.TRUSTED_PROXIES)
+            return value if isinstance(value, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 settings = Settings()

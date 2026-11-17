@@ -11,8 +11,9 @@ export interface User {
   id: number;
   email: string;
   full_name: string;
-  role: 'user' | 'admin' | 'employer';
+  role: 'user' | 'admin' | 'recruiter';
   is_active: boolean;
+  is_verified: boolean;
   created_at: string;
 }
 
@@ -142,6 +143,7 @@ export interface Job {
   salary_min?: number;
   salary_max?: number;
   is_active: boolean;
+  owner_id?: number | null;
   job_skills: JobSkill[];
   created_at: string;
 }
@@ -149,6 +151,63 @@ export interface Job {
 export interface AdminJobListResponse extends PaginatedResponse<Job> {
   active_total: number;
   category_count: number;
+}
+
+export type ReviewStatus = 'new' | 'viewed' | 'shortlisted' | 'rejected' | 'hired';
+
+export interface Applicant {
+  id: number;
+  user_id: number;
+  candidate_name: string;
+  candidate_email: string;
+  cv_id: number;
+  cv_filename: string;
+  match_score: number;
+  matched_skills: Record<string, unknown>[];
+  missing_skills: Record<string, unknown>[];
+  weak_skills: Record<string, unknown>[];
+  review_status: ReviewStatus;
+  recruiter_note?: string | null;
+  reviewed_at?: string | null;
+  matched_at?: string | null;
+}
+
+export interface SkillCount {
+  skill_name: string;
+  count: number;
+}
+
+export interface JobStats {
+  job_id: number;
+  total_applicants: number;
+  avg_score?: number | null;
+  review_status_counts: Record<string, number>;
+  score_buckets: Record<string, number>;
+  top_missing_skills: SkillCount[];
+  top_weak_skills: SkillCount[];
+}
+
+export interface OverviewStats {
+  period_days: number;
+  totals: Record<string, number>;
+  new_in_period: Record<string, number>;
+  users_by_role: Record<string, number>;
+  cvs_by_status: Record<string, number>;
+  matches_by_review_status: Record<string, number>;
+  top_recruiters: Array<{ id: number; full_name: string; email: string; job_count: number }>;
+  top_missing_skills: Array<Record<string, unknown>>;
+  top_weak_skills: Array<Record<string, unknown>>;
+}
+
+export interface RecruiterOverview {
+  total_jobs: number;
+  total_applicants: number;
+  pending_review: number;
+  recent_jobs: Array<Record<string, unknown>>;
+}
+export interface NewApplicantNotice extends Applicant {
+  job_id: number;
+  job_title: string;
 }
 
 export interface JobSkill {

@@ -68,11 +68,12 @@ def _password_version(user_id: int, password_hash: str, purpose: str) -> str:
     return hmac.new(settings.SECRET_KEY.encode("utf-8"), message, hashlib.sha256).hexdigest()
 
 
-def create_user_access_token(user_id: int, password_hash: str) -> str:
+def create_user_access_token(user_id: int, password_hash: str, token_version: int = 0) -> str:
     return create_access_token(
         {
             "sub": str(user_id),
             "password_version": _password_version(user_id, password_hash, "access"),
+            "token_version": token_version,
         },
     )
 
@@ -124,6 +125,9 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).populate_existing().first()
     if user is None or not _token_password_matches(payload, user.id, user.password_hash, "access"):
         raise credentials_exception
+    token_version = payload.get("token_version", 0)
+    if not isinstance(token_version, int) or token_version != (user.token_version or 0):
+        raise credentials_exception
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -139,8 +143,17 @@ def get_current_admin(current_user=Depends(get_current_user)):
     return current_user
 
 
-def get_current_employer(current_user=Depends(get_current_user)):
+def get_current_recruiter(current_user=Depends(get_current_user)):
     """Dependency cho các endpoint chỉ dành cho Nhà tuyển dụng."""
-    if current_user.role != "employer":
+    if current_user.role != "recruiter":
         raise HTTPException(status_code=403, detail="Chỉ tài khoản nhà tuyển dụng mới có quyền này")
+    return current_user
+
+
+def get_current_admin_or_recruiter(current_user=Depends(get_current_user)):
+    """Dependency cho quản lý Job: admin toàn quyền, recruiter giới hạn theo sở hữu."""
+    if current_user.role not in ("admin", "recruiter"):
+        raise HTTPException(status_code=403, detail="Cần quyền quản trị hoặc nhà tuyển dụng")
+    if current_user.role == "recruiter" and not getattr(current_user, "is_verified", True):
+        raise HTTPException(status_code=403, detail="Tài khoản nhà tuyển dụng đang chờ admin phê duyệt")
     return current_user

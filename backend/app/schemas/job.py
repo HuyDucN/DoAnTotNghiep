@@ -96,6 +96,7 @@ class JobResponse(BaseModel):
     salary_min: Optional[int]
     salary_max: Optional[int]
     is_active: bool
+    owner_id: Optional[int] = None
     job_skills: List[JobSkillResponse] = []
     created_at: datetime
 
@@ -116,6 +117,69 @@ class AdminJobListResponse(PaginatedResponse[JobResponse]):
     """Thống kê trên toàn bộ kết quả lọc, không chỉ trang hiện tại."""
     active_total: int
     category_count: int
+
+
+class SkillCount(BaseModel):
+    skill_name: str
+    count: int
+
+
+class JobStatsResponse(BaseModel):
+    """Thống kê sơ tuyển cho một job."""
+
+    job_id: int
+    total_applicants: int
+    avg_score: Optional[float] = None
+    review_status_counts: dict[str, int] = {}
+    score_buckets: dict[str, int] = {}
+    top_missing_skills: List[SkillCount] = []
+    top_weak_skills: List[SkillCount] = []
+
+
+ReviewStatus = Literal["new", "viewed", "shortlisted", "rejected", "hired"]
+
+
+class ApplicantResponse(BaseModel):
+    """Một lượt match ứng viên cho job — phía tuyển dụng xem."""
+
+    id: int
+    user_id: int
+    candidate_name: str
+    candidate_email: str
+    cv_id: int
+    cv_filename: str
+    match_score: float
+    matched_skills: List[dict]
+    missing_skills: List[dict]
+    weak_skills: List[dict]
+    review_status: ReviewStatus = "new"
+    recruiter_note: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    matched_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class NewApplicantNotice(ApplicantResponse):
+    """Ứng viên mới kèm job — dùng cho thông báo của recruiter."""
+
+    job_id: int
+    job_title: str
+
+
+class ApplicantReviewUpdate(BaseModel):
+    """Cập nhật pipeline sơ tuyển; bỏ qua trường nào giữ nguyên trường đó."""
+
+    review_status: Optional[ReviewStatus] = None
+    recruiter_note: Optional[str] = Field(default=None, max_length=2000)
+
+    @field_validator("recruiter_note")
+    @classmethod
+    def blank_note_is_null(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and not value.strip():
+            return None
+        return value
 
 
 class SkillGroupScore(BaseModel):
@@ -139,6 +203,9 @@ class SkillGapResponse(BaseModel):
     created_at: datetime
     matched_at: Optional[datetime] = None
     job_snapshot_available: bool = False
+    # Pipeline sơ tuyển (ứng viên thấy trạng thái, không thấy ghi chú nội bộ).
+    review_status: ReviewStatus = "new"
+    reviewed_at: Optional[datetime] = None
 
     @field_validator("matched_at")
     @classmethod

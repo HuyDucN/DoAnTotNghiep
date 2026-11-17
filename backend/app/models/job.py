@@ -26,6 +26,7 @@ class Job(Base):
     description = Column(Text)
     salary_min = Column(Integer)
     salary_max = Column(Integer)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     is_active = Column(Boolean, default=True)
     is_deleted = Column(Boolean, default=False, nullable=False)  # Soft Delete: True = đã xóa
     deleted_at = Column(DateTime(timezone=True), nullable=True)  # Thời điểm xóa mềm
@@ -33,6 +34,7 @@ class Job(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
+    owner = relationship("User", foreign_keys=[owner_id])
     job_skills = relationship("JobSkill", back_populates="job", cascade="all, delete-orphan")
     skill_gaps = relationship("SkillGap", back_populates="job", cascade="all, delete-orphan")
 

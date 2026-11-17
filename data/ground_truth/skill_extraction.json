@@ -1,4 +1,22 @@
 [
   {"id": "sample-01", "text": "Python, FastAPI, MySQL", "skills": ["python", "fastapi", "mysql"]},
-  {"id": "sample-02", "text": "React and TypeScript developer", "skills": ["react", "typescript"]}
+  {"id": "sample-02", "text": "React and TypeScript developer", "skills": ["react", "typescript"]},
+  {"id": "sample-03", "text": "Backend developer with Python, Django, PostgreSQL, Docker", "skills": ["python", "django", "postgresql", "docker"]},
+  {"id": "sample-04", "text": "Frontend: React, Vue, JavaScript, TypeScript", "skills": ["react", "vue", "javascript", "typescript"]},
+  {"id": "sample-05", "text": "Machine Learning engineer: Python, TensorFlow, PyTorch", "skills": ["python", "machine learning", "tensorflow", "pytorch"]},
+  {"id": "sample-06", "text": "DevOps with AWS, Kubernetes, CI/CD, Linux, Git", "skills": ["aws", "kubernetes", "git"]},
+  {"id": "sample-07", "text": "Fullstack Node.Js, React, MongoDB, Redis", "skills": ["node.js", "react", "mongodb", "redis"]},
+  {"id": "sample-08", "text": "Mobile developer Java, Kotlin, Android", "skills": ["java"]},
+  {"id": "sample-09", "text": "Data analyst: SQL, Python, MySQL", "skills": ["sql", "python", "mysql"]},
+  {"id": "sample-10", "text": "C++ and C# game developer, Unity", "skills": ["c++", "c#"]},
+  {"id": "sample-11", "text": "Experienced with Git, GitHub Actions, Jenkins", "skills": ["git"]},
+  {"id": "sample-12", "text": "machine-learning, Machine Learning, MACHINE_LEARNING researcher", "skills": ["machine learning"]},
+  {"id": "sample-13", "text": "No technical skills here, only teamwork and communication", "skills": []},
+  {"id": "sample-14", "text": "Golang microservices with gRPC and Redis", "skills": ["redis"]},
+  {"id": "sample-15", "text": "JavaScript, Angular, Node.js, AWS", "skills": ["javascript", "angular", "node.js", "aws"]},
+  {"id": "sample-16", "text": "QA engineer, manual testing, no automation tools mentioned", "skills": []},
+  {"id": "sample-17", "text": "Deep Learning with PyTorch and Python on Azure", "skills": ["pytorch", "python", "azure"]},
+  {"id": "sample-18", "text": "C programmer, embedded systems, Linux", "skills": ["c"]},
+  {"id": "sample-19", "text": "Figma designer, Jira, VS Code user", "skills": []},
+  {"id": "sample-20", "text": "Spring backend with Java, MySQL and Docker", "skills": ["java", "mysql", "docker"]}
 ]

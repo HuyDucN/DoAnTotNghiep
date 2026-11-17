@@ -176,8 +176,8 @@ export default function SettingsPage() {
                 <div className="settings-avatar bg-brand">{(fullName || 'U').charAt(0).toUpperCase()}</div>
                 <div>
                   <p className="font-semibold">{user?.email}</p>
-                  <span className={`badge ${user?.role === 'admin' ? 'badge-primary' : 'badge-neutral'}`}>
-                    {user?.role === 'admin' ? 'Quản trị viên' : 'Người dùng'}
+                  <span className={`badge ${user?.role === 'user' ? 'badge-neutral' : 'badge-primary'}`}>
+                    {user?.role === 'admin' ? 'Quản trị viên' : user?.role === 'recruiter' ? 'Nhà tuyển dụng' : 'Người dùng'}
                   </span>
                 </div>
               </div>

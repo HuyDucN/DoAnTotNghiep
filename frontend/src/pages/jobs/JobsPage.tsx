@@ -63,11 +63,11 @@ function SkillGapRadar({ result }: { result: SkillGapResult }) {
       <div className="skill-radar-chart">
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={data} outerRadius="68%">
-            <PolarGrid stroke="rgba(148,163,184,0.25)" />
-            <PolarAngleAxis dataKey="importance" tick={{ fill: '#cbd5e1', fontSize: 12 }} />
-            <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-            <Radar name="Yêu cầu công việc" dataKey="requirement" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.12} />
-            <Radar name="CV tại lần so khớp" dataKey="candidate" stroke="#818cf8" fill="#818cf8" fillOpacity={0.35} />
+            <PolarGrid stroke="#e2e5ee" />
+            <PolarAngleAxis dataKey="importance" tick={{ fill: '#667085', fontSize: 11 }} />
+            <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: '#98a0b2', fontSize: 9 }} />
+            <Radar name="Yêu cầu công việc" dataKey="requirement" stroke="#c28a2f" fill="#d6a04a" fillOpacity={0.12} />
+            <Radar name="CV tại lần so khớp" dataKey="candidate" stroke="#6253d9" fill="#6253d9" fillOpacity={0.2} />
             <Tooltip formatter={(value) => `${value}%`} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
           </RadarChart>

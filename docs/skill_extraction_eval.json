@@ -1,0 +1,175 @@
+{
+  "samples": 20,
+  "micro": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "macro": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "per_sample": [
+    {
+      "id": "sample-01",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-02",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-03",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-04",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-05",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-06",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-07",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-08",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-09",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-10",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-11",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-12",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-13",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-14",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-15",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-16",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-17",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-18",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-19",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "id": "sample-20",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "missing": [],
+      "extra": []
+    }
+  ]
+}

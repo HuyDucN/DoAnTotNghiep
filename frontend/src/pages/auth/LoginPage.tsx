@@ -7,7 +7,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import './AuthPage.css';
+import AuthLayout from './AuthLayout';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Email không hợp lệ'),
@@ -36,23 +36,15 @@ export default function LoginPage() {
       if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
       setAuth(data.user, data.access_token);
       toast.success(`Chào mừng, ${data.user.full_name}! 🎉`);
-      // Redirect theo role: admin → /admin, user → /dashboard
-      navigate(data.user.role === 'admin' ? '/admin' : '/dashboard');
+      // Redirect theo role: admin → /admin, recruiter → /admin/jobs, user → /dashboard
+      navigate(data.user.role === 'admin' ? '/admin' : data.user.role === 'recruiter' ? '/admin/jobs' : '/dashboard');
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Đăng nhập thất bại');
     }
   };
 
   return (
-    <div className="auth-page">
-      {/* Animated background */}
-      <div className="auth-bg">
-        <div className="auth-orb auth-orb-1" />
-        <div className="auth-orb auth-orb-2" />
-        <div className="auth-orb auth-orb-3" />
-      </div>
-
-      <div className="auth-card animate-fade-in">
+    <AuthLayout>
         {/* Logo */}
         <div className="auth-logo">
           <div className="auth-logo-mark">
@@ -78,9 +70,11 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="auth-form" noValidate>
           <div className="form-group">
-            <label className="form-label">Email</label>
+            <label className="form-label" htmlFor="login-email">Email</label>
             <input
               type="email"
+              id="login-email"
+              autoComplete="email"
               className={`form-input ${errors.email ? 'input-error' : ''}`}
               placeholder="email@example.com"
               aria-invalid={Boolean(errors.email)}
@@ -90,10 +84,12 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Mật khẩu</label>
+            <label className="form-label" htmlFor="login-password">Mật khẩu</label>
             <div className="input-wrapper">
               <input
                 type={showPassword ? 'text' : 'password'}
+                id="login-password"
+                autoComplete="current-password"
                 className={`form-input ${errors.password ? 'input-error' : ''}`}
                 placeholder="••••••••"
                 aria-invalid={Boolean(errors.password)}
@@ -103,7 +99,6 @@ export default function LoginPage() {
                 type="button"
                 className="input-eye-btn"
                 onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
                 aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -112,8 +107,8 @@ export default function LoginPage() {
             {errors.password && <p className="form-error">{errors.password.message}</p>}
           </div>
 
-          <div style={{ textAlign: 'right', marginTop: '-0.5rem' }}>
-            <Link to="/forgot-password" style={{ fontSize: '0.875rem', color: '#a5b4fc', fontWeight: 500 }}>
+          <div className="auth-forgot">
+            <Link to="/forgot-password">
               Quên mật khẩu?
             </Link>
           </div>
@@ -127,7 +122,6 @@ export default function LoginPage() {
           Chưa có tài khoản?{' '}
           <Link to="/register" className="auth-link">Đăng ký ngay</Link>
         </p>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

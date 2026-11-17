@@ -10,6 +10,9 @@
 - Người dùng đăng ký/đăng nhập, quản lý hồ sơ cá nhân, CV của mình và lịch sử so khớp.
 - Người dùng chỉ được xem/tải/xóa CV thuộc tài khoản của mình.
 - Admin quản lý người dùng, bật/tắt tài khoản, CV, job và skill.
+- Nhà tuyển dụng (recruiter) đăng ký chờ admin phê duyệt (`is_verified`); chưa duyệt không được quản lý job. Admin duyệt/thu hồi qua `PATCH /api/admin/users/{id}/verify` (thu hồi JWT cũ).
+- Nhật ký kiểm toán ghi hành động quản trị (`GET /api/admin/audit-logs`): khóa/mở user, duyệt recruiter, CRUD job/skill, review ứng viên, xóa CV.
+- Job cũ chưa có chủ (`owner_id` NULL) thuộc quyền admin.
 - Không cho admin tự khóa tài khoản hoặc khóa admin hoạt động cuối cùng.
 - Các thao tác quản trị dùng chung xác thực admin; endpoint đăng ký, đăng nhập, phục hồi mật khẩu, upload CV và match có giới hạn tần suất.
 
@@ -21,6 +24,9 @@
 - Tạo/cập nhật/xóa job cùng danh sách kỹ năng bắt buộc và ưu tiên.
 - Lọc job theo danh mục, cấp bậc và từ khóa; job ngừng hoạt động không xuất hiện ở API chi tiết hoặc match.
 - So khớp CV-job và lưu lịch sử kết quả; admin có màn hình tìm kiếm, khóa/mở khóa người dùng.
+- Tuyển dụng xem ứng viên đã match từng job của họ (`GET /api/jobs/admin/{id}/applicants`, lọc trạng thái, phân trang) và cập nhật pipeline sơ tuyển (`PATCH /api/jobs/admin/applicants/{id}`): new/viewed/shortlisted/rejected/hired kèm ghi chú nội bộ; ứng viên chỉ thấy trạng thái của mình, không thấy ghi chú.
+- Thống kê sơ tuyển từng job (`GET /api/jobs/admin/{id}/stats`): số ứng viên, điểm trung bình, phân bổ trạng thái, nhóm điểm, top kỹ năng thiếu/yếu. Recruiter có tổng quan nhanh job của họ (`GET /api/jobs/admin-overview/mine`); admin có thống kê vận hành toàn hệ thống (`GET /api/admin/stats`, dữ liệu mới theo `days`).
+- Thông báo ứng viên mới (`GET /api/jobs/admin/notifications/new-applicants`, lọc theo `days`); nhân bản job kèm kỹ năng (`POST /api/jobs/admin/{id}/duplicate`, bản sao để ẩn); xuất CSV ứng viên (`GET /api/jobs/admin/{id}/applicants/export`, tối đa 2000 dòng, lọc theo trạng thái).
 
 ## Quy tắc so khớp
 - Ngưỡng năng lực tối thiểu theo cấp bậc: intern/fresher = beginner; junior/mid = intermediate; senior/lead = advanced.
@@ -40,10 +46,10 @@
 ## Dữ liệu và tích hợp
 - Cơ sở dữ liệu MySQL gồm users, profiles, cvs, skills, cv_skills, jobs, job_skills và skill_gaps.
 - Phân tích AI gửi văn bản CV đã giới hạn và che email/số điện thoại đến endpoint OpenAI-compatible được cấu hình bằng `OPENAI_BASE_URL`. Nhà vận hành cần công bố chính sách xử lý dữ liệu và chọn nhà cung cấp phù hợp trước khi triển khai.
-- Tập đánh giá đại diện, nhãn ground truth và phép đo Precision/Recall/F1 chưa được thiết lập.
+- Tập đánh giá gồm 20 mẫu trong `data/ground_truth/skill_extraction.json`; chạy `python scripts/evaluate_skill_extraction.py predictions.json` để tính Precision/Recall/F1 (micro + macro, chuẩn hóa tên qua `skill_names.py`). Kết quả baseline bộ đọc cục bộ: micro P/R/F1 = 1.0, macro = 1.0, chi tiết từng mẫu trong `docs/skill_extraction_eval.json`. Đánh giá AI thật cần chạy thêm trên cùng tập và so sánh.
 
 ## Yêu cầu vận hành
 - Cấu hình bí mật, mật khẩu DB, URL AI, CORS, thư mục upload và Tesseract qua biến môi trường.
 - Production yêu cầu `SECRET_KEY` tối thiểu 32 ký tự, DB password và `DEBUG=False`.
-- Rate limit hiện lưu trong bộ nhớ từng tiến trình; triển khai nhiều worker/instance cần chuyển sang kho chia sẻ như Redis để có giới hạn nhất quán.
+- Rate limit dùng địa chỉ IP kết nối trực tiếp và route template, không tin `X-Forwarded-For` trừ proxy trong `TRUSTED_PROXIES`; khi cấu hình `REDIS_URL` thì dùng Redis sliding-window dùng chung nhiều worker, lỗi Redis cho qua để không chặn dịch vụ, chưa cấu hình thì fallback bộ nhớ từng tiến trình.
 - Schema mới được tạo tự động trong môi trường development; thay đổi schema DB hiện hữu cần chạy migration có kiểm soát.

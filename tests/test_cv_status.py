@@ -2,7 +2,8 @@ from types import SimpleNamespace
 
 from fastapi import HTTPException
 
-from app.api.cv import _get_analysis_lock, get_cv_status
+from app.api.cv import get_cv_status
+from app.services.analysis_queue import _get_analysis_lock
 
 
 class FakeQuery:

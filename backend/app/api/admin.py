@@ -2,17 +2,24 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_admin
+from app.models.audit_log import AuditLog
 from app.models.user import User
-from app.schemas.user import UserResponse, UserActiveUpdate as ActiveUpdate, AdminUserListResponse
+from app.schemas.user import (
+    UserResponse, UserActiveUpdate as ActiveUpdate, AdminUserListResponse,
+    UserVerifyUpdate, AuditLogResponse, PaginatedAuditLogResponse,
+    OverviewStatsResponse,
+)
+from app.services.stats import overview_stats as build_overview_stats
 from app.models.cv import CV
 from app.schemas.cv import CVResponse
 from app.schemas.job import PaginatedResponse
+from app.services.audit import log_audit
 from app.services.user_management import set_user_active
 from app.services.cv_deletion import delete_stored_cv
 
@@ -61,6 +68,58 @@ def update_user_active(
     return set_user_active(user_id, payload.is_active, db, current_admin)
 
 
+@router.patch("/users/{user_id}/verify", response_model=UserResponse)
+def verify_recruiter(
+    user_id: int,
+    payload: UserVerifyUpdate,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    """[Admin] Duyệt hoặc thu hồi quyền nhà tuyển dụng."""
+    user = db.query(User).filter(User.id == user_id).with_for_update().populate_existing().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Người dùng không tồn tại")
+    if user.role != "recruiter":
+        raise HTTPException(status_code=400, detail="Chỉ áp dụng cho tài khoản nhà tuyển dụng")
+    user.is_verified = payload.is_verified
+    user.token_version = (user.token_version or 0) + 1
+    log_audit(
+        db, current_admin.id, "recruiter.verify",
+        target_type="user", target_id=user.id,
+        detail={"is_verified": payload.is_verified},
+    )
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.get("/audit-logs", response_model=PaginatedAuditLogResponse)
+def list_audit_logs(
+    action: Optional[str] = None,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """[Admin] Nhật ký kiểm toán, mới nhất trước, lọc theo loại hành động."""
+    query = db.query(AuditLog).order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+    if action:
+        query = query.filter(AuditLog.action == action)
+    total = query.count()
+    pages = max(1, -(-total // size))
+    rows = query.offset((page - 1) * size).limit(size).all()
+    items = [
+        AuditLogResponse(
+            id=row.id, actor_id=row.actor_id,
+            actor_email=row.actor.email if row.actor else None,
+            action=row.action, target_type=row.target_type, target_id=row.target_id,
+            detail=row.detail, created_at=row.created_at,
+        )
+        for row in rows
+    ]
+    return PaginatedAuditLogResponse(items=items, total=total, page=page, size=size, pages=pages)
+
+
 @router.get("/cvs", response_model=PaginatedResponse[CVResponse])
 def list_all_cvs(
     page: int = Query(default=1, ge=1, description="Trang hiện tại"),
@@ -77,5 +136,19 @@ def list_all_cvs(
 
 
 @router.delete("/cvs/{cv_id}", status_code=204)
-def delete_any_cv(cv_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_admin)):
-    delete_stored_cv(cv_id, db)
+def delete_any_cv(
+    cv_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    delete_stored_cv(cv_id, db, audit_actor_id=current_admin.id)
+
+
+@router.get("/stats", response_model=OverviewStatsResponse)
+def get_overview_stats(
+    days: int = Query(default=7, ge=1, le=90, description="Số ngày tính dữ liệu mới"),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """[Admin] Thống kê vận hành toàn hệ thống."""
+    return build_overview_stats(db, days)
